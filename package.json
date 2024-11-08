@@ -1,17 +1,49 @@
 {
-  "name": "picamera",
+  "name": "picamera.js",
   "version": "1.0.0",
-  "main": "./dist/picamera.esm.js",
-  "types": "./dist/index.d.ts",
-  "module": "./dist/picamera.esm.js",
+  "main": "dist/picamera.js",
+  "types": "build/index.d.ts",
+  "module": "dist/picamera.esm.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TzuHuanTai/PiCamera.js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TzuHuanTai/PiCamera.js"
+  },
   "scripts": {
     "build": "node build.js && tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "raspberry",
+    "pi",
+    "webrtc",
+    "camera",
+    "p2p"
+  ],
+  "author": "Tzu Huan Tai",
   "license": "AGPL-3.0-only",
-  "description": "",
+  "description": "WebRTC connection for Raspberry Pi Camera",
+  "files": [
+    "dist/",
+    "build/",
+    "src/",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "browser": {
+        "import": "./dist/picamera.esm.js",
+        "default": "./dist/picamera.min.js"
+      },
+      "default": "./build/index.js"
+    },
+    "./package.json": "./package.json",
+    "./*.map": "./build/*.js.map",
+    "./dist/*": "./dist/*.js",
+    "./*": "./build/*.js"
+  },
   "devDependencies": {
     "esbuild": "^0.24.0",
     "typescript": "^5.6.3"

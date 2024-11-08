@@ -1,11 +1,30 @@
-// build.js
 const esbuild = require('esbuild');
 
-esbuild.build({
-  entryPoints: ['./src/index.ts'], // 入口文件
+const outdir = 'dist';
+
+const options = {
+  entryPoints: ['./src/index.ts'],
   bundle: true,
-  platform: 'browser', // 可以是 'node' 或 'browser'
-  format: 'esm', // 輸出格式 'cjs' 或 'esm'
-  outfile: './dist/picamera.esm.js', // 輸出文件
-  sourcemap: true, // 生成 source map
-}).catch(() => process.exit(1));
+  platform: 'browser',
+  format: 'iife',
+  outfile: `${outdir}/picamera.js`,
+  sourcemap: false,
+}
+
+async function run() {
+
+  await esbuild.build(options);
+
+  options.minify = true
+  options.outfile = `${outdir}/picamera.min.js`;
+  await esbuild.build(options)
+
+  options.outfile = `${outdir}/picamera.esm.js`;
+  options.format = 'esm';
+  await esbuild.build(options);
+}
+
+run().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

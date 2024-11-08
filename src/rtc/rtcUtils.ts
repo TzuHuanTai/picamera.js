@@ -6,42 +6,31 @@ export enum CommandType {
   UNKNOWN
 };
 
+export enum MetadataCommand {
+  LATEST,
+  OLDER,
+  SPECIFIC_TIME
+};
+
 export class RtcMessage {
   type: CommandType;
   message?: string;
 
   constructor(type: CommandType, message: string | number) {
     this.type = type;
-    if (typeof message === 'string') {
-      this.message = message;
-    } else if (typeof message === 'number') {
-      this.message = String(message);
-    }
-  }
-
-  ToString(): string {
-    return JSON.stringify(this);
+    this.message = typeof message === 'string' ? message : String(message);
   }
 }
 
 export class MetaCmdMessage {
   command: MetadataCommand;
   message: string;
+
   constructor(command: MetadataCommand, message: string = "") {
     this.command = command;
     this.message = message;
   }
-
-  ToString(): string {
-    return JSON.stringify(this);
-  }
 }
-
-export enum MetadataCommand {
-  LATEST,
-  OLDER,
-  SPECIFIC_TIME
-};
 
 /**
  * Remove a specific codec from SDP.
@@ -50,52 +39,28 @@ export enum MetadataCommand {
  * @returns {string} - Modified SDP string.
  */
 export function removeCodec(orgsdp: string, codec: string): string {
-  const internalFunc = (sdp: string): string => {
-    const codecre = new RegExp('(a=rtpmap:(\\d*) ' + codec + '\/90000\\r\\n)');
-    const rtpmaps = sdp.match(codecre);
-    if (rtpmaps == null || rtpmaps.length <= 2) {
-      return sdp;
-    }
-    const rtpmap = rtpmaps[2];
-    let modsdp = sdp.replace(codecre, "");
+  const codecRegex = new RegExp(`a=rtpmap:(\\d*) ${codec}/90000\\r\\n`);
+  let modifiedSdp = orgsdp.replace(codecRegex, "");
 
-    const rtcpre = new RegExp('(a=rtcp-fb:' + rtpmap + '.*\r\n)', 'g');
-    modsdp = modsdp.replace(rtcpre, "");
+  // Remove associated rtcp-fb, fmtp, and apt lines
+  modifiedSdp = modifiedSdp.replace(new RegExp(`a=rtcp-fb:(\\d*) ${codec}.*\\r\\n`, 'g'), '');
+  modifiedSdp = modifiedSdp.replace(new RegExp(`a=fmtp:(\\d*) ${codec}.*\\r\\n`, 'g'), '');
 
-    const fmtpre = new RegExp('(a=fmtp:' + rtpmap + '.*\r\n)', 'g');
-    modsdp = modsdp.replace(fmtpre, "");
+  // Handle fmtp apt
+  const aptRegex = new RegExp(`a=fmtp:(\\d*) apt=(\\d*)\\r\\n`);
+  modifiedSdp = modifiedSdp.replace(aptRegex, '');
 
-    const aptpre = new RegExp('(a=fmtp:(\\d*) apt=' + rtpmap + '\\r\\n)');
-    const aptmaps = modsdp.match(aptpre);
-    let fmtpmap = "";
-    if (aptmaps != null && aptmaps.length >= 3) {
-      fmtpmap = aptmaps[2];
-      modsdp = modsdp.replace(aptpre, "");
-
-      const rtppre = new RegExp('(a=rtpmap:' + fmtpmap + '.*\r\n)', 'g');
-      modsdp = modsdp.replace(rtppre, "");
-    }
-
-    let videore = /(m=video.*\r\n)/;
-    const videolines = modsdp.match(videore);
-    if (videolines != null) {
-      //If many m=video are found in SDP, this program doesn't work.
-      let videoline = videolines[0].substring(0, videolines[0].length - 2);
-      const videoelems = videoline.split(" ");
-      let modvideoline = videoelems[0];
-      videoelems.forEach((videoelem, index) => {
-        if (index === 0) return;
-        if (videoelem === rtpmap || videoelem === fmtpmap) {
-          return;
-        }
-        modvideoline += " " + videoelem;
-      })
-      modvideoline += "\r\n";
-      modsdp = modsdp.replace(videore, modvideoline);
-    }
-    return internalFunc(modsdp);
+  // Process video line modifications
+  const videoLineRegex = /m=video.*\r\n/;
+  const videoLineMatch = modifiedSdp.match(videoLineRegex);
+  if (videoLineMatch) {
+    let videoLine = videoLineMatch[0].trim();
+    const videoElements = videoLine.split(" ");
+    videoLine = videoElements.filter(el => el !== codec).join(" ") + "\r\n";
+    modifiedSdp = modifiedSdp.replace(videoLineRegex, videoLine);
   }
-  return internalFunc(orgsdp);
+
+  return modifiedSdp;
 }
 
 /**
@@ -126,8 +91,7 @@ export function stringToArrayBuffer(str: string): Uint8Array {
  * @returns {string} - The resulting Base64 string.
  */
 export function arrayBufferToBase64(buffer: Uint8Array): string {
-  const binary = arrayBufferToString(buffer);
-  return btoa(binary);
+  return btoa(arrayBufferToString(buffer));
 }
 
 export function generateUid(length: number): string {

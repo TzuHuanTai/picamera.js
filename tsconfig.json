@@ -3,7 +3,8 @@
     "target": "ES6",
     "module": "CommonJS",
     "declaration": true,
-    "outDir": "./dist",
+    "removeComments": true,
+    "outDir": "./build",
     "strict": true
   },
   "include": [
@@ -11,6 +12,8 @@
   ],
   "exclude": [
     "node_modules",
+    "dist",
+    "build",
     "**/*.test.ts"
   ]
 }
