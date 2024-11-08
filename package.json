@@ -1,6 +1,6 @@
 {
   "name": "picamera.js",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "dist/picamera.js",
   "types": "build/index.d.ts",
   "module": "dist/picamera.esm.js",
