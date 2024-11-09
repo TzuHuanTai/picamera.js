@@ -12,8 +12,8 @@ This package provides the JavaScript client-side implementation for [pi_webrtc](
 npm install picamera.js
 ```
 # Example
-For the sake of simplicity, let's put the subscriber and the publisher in the same file:
-
+### Live video
+Display live streaming on the HTML `<video>` element.
 ```javascript
 import { PiCamera } from 'picamera.js';
 
@@ -29,6 +29,32 @@ let conn = new PiCamera({
   stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
 });
 conn.attach(videoRef);
+conn.connect();
+```
+
+### Snapshot
+Use webrtc datachannel to get the snapshot image only.
+```javascript
+let conn = new PiCamera({
+  deviceId: 'your-custom-uid',
+  mqttHost: 'your.mqtt.cloud',
+  mqttPath: '/mqtt',
+  mqttPort: '8884', // Websocket Port
+  mqttUsername: 'hakunamatata',
+  mqttPassword: 'Wonderful',
+  stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
+  datachannelOnly: true,
+});
+
+conn.onDatachannel = (dc) => {
+  conn.snapshot();
+}
+
+conn.onSnapshot = (image) => {
+  // image: the received base64 string
+  conn.terminate();
+}
+
 conn.connect();
 ```
 
