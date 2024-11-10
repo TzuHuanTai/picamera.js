@@ -2,7 +2,7 @@ import mqtt, { MqttClient as MqttLibClient, IClientOptions } from 'mqtt';
 import { generateUid } from '../rtc/rtcUtils';
 
 export interface IMqttConnectionOptions {
-  deviceId: string;
+  deviceUid: string;
   mqttHost: string;
   mqttPath: string;
   mqttPort: number;
@@ -49,7 +49,7 @@ export class MqttClient {
     if (!this.client) return;
 
     this.client.on('connect', () => {
-      console.debug(`MQTT connection (${this.clientId}) established. -> ${this.options.deviceId}`);
+      console.debug(`MQTT connection (${this.clientId}) established. -> ${this.options.deviceUid}`);
       this.onConnect?.(this);
     });
 
@@ -106,6 +106,6 @@ export class MqttClient {
   isConnected = (): boolean => this.client?.connected ?? false;
 
   private constructTopic(topic: string): string {
-    return `${this.options.deviceId}/${topic}/${this.clientId}`;
+    return `${this.options.deviceUid}/${topic}/${this.clientId}`;
   }
 }

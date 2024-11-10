@@ -20,7 +20,7 @@ import { PiCamera } from 'picamera.js';
 let videoElement = document.getElementById('videoElement');
 
 let conn = new PiCamera({
-  deviceId: 'your-custom-uid',
+  deviceUid: 'your-custom-uid',
   mqttHost: 'your.mqtt.cloud',
   mqttPath: '/mqtt',
   mqttPort: '8884', // Websocket Port
@@ -32,17 +32,17 @@ conn.attach(videoRef);
 conn.connect();
 ```
 
-### Snapshot
+### Capture a snapshot
 Use webrtc datachannel to get the snapshot image only.
 ```javascript
 let conn = new PiCamera({
-  deviceId: 'your-custom-uid',
+  deviceUid: 'your-custom-uid',
   mqttHost: 'your.mqtt.cloud',
   mqttPath: '/mqtt',
   mqttPort: '8884', // Websocket Port
   mqttUsername: 'hakunamatata',
   mqttPassword: 'Wonderful',
-  stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
+  stunUrls: ["stun:stun1.l.google.com:19302"],
   datachannelOnly: true,
 });
 
@@ -51,12 +51,122 @@ conn.onDatachannel = (dc) => {
 }
 
 conn.onSnapshot = (image) => {
-  // image: the received base64 string
+  // get a base64 image here, then terminate the connection.
   conn.terminate();
 }
 
 conn.connect();
 ```
+
+# API
+* [Options](#options)
+* [Events](#events)
+  * [onConnectionState](#onConnectionState)
+  * [onDatachannel](#onDatachannel)
+  * [onSnapshot](#onSnapshot)
+  * [onTimeout](#onTimeout)
+* [Methods](#methods)
+  * [attach](#attach)
+  * [connect](#connect)
+  * [terminate](#terminate)
+  * [getStatus](#getStatus)
+  * [snapshot](#snapshot)
+  * [connect](#connect)
+  * [toggleMic](#toggleMic)
+  * [toggleSpeaker](#toggleSpeaker)
+
+## Options
+
+Available flags for initiazation.
+
+| Option          | Type      | Default | Description                                                                        |
+|-----------------|-----------|---------|------------------------------------------------------------------------------------|
+| deviceUid       | `string`  |         | The custom `--uid` provided in the running `pi_webrtc`.                            |
+| mqttHost        | `string`  |         | The MQTT server host.                                                              |
+| mqttPath        | `string`  | `/mqtt` | The MQTT server path.                                                              |
+| mqttPort        | `number`  | `8884`  | The WebSocket port for the MQTT server.                                            |
+| mqttUsername    | `string`  |         | The username for the MQTT server.                                                  |
+| mqttPassword    | `string`  |         | The password for the MQTT server.                                                  |
+| stunUrls        | `string[]`|         | An array of STUN server URLs for WebRTC.                                           |
+| turnUrl         | `string`  |         | The TURN server URL for WebRTC.                                                    |
+| turnUsername    | `string`  |         | The username for the TURN server.                                                  |
+| turnPassword    | `string`  |         | The password for the TURN server.                                                  |
+| timeout         | `number`  | `10000` | The connection timeout in milliseconds (`ms`).                                     |
+| datachannelOnly | `boolean` | `false` | Specifies that the connection is only for data transfer, without media streams.    |
+| isMicOn         | `boolean` | `true`  | Enables the local microphone stream by default if the connection is established.   |
+| isSpeakerOn     | `boolean` | `true`  | Enables the remote audio stream by default if the connection is established.       |
+
+## Events
+- ### onConnectionState
+
+  `= (state: RTCPeerConnectionState) => {}`
+
+  Emitted when the WebRTC peer connection state changes.
+
+- ### onDatachannel
+
+  `= (dataChannel: RTCDataChannel) => {}`
+
+  Emitted when the data channel successfully opens for data communication.
+
+- ### onSnapshot
+
+  `= (image: string) => {}`
+
+  Triggered after calling the `snapshot()` method. Emits a base64-encoded image once all image packets are received from the server.
+
+- ### onTimeout
+
+  `= () => {}`
+
+  Emitted when the P2P connection cannot be established within the allotted time. Automatically calls the `terminate()` function.
+
+## Methods
+- ### attach
+
+  `.attach(mediaElement: HTMLVideoElement)`
+
+  Attaches the remote media stream to the specified media element for playback.
+
+  - `mediaElement` - The HTML `<video>` element where the remote media stream will be rendered.
+
+- ### connect
+
+  `.connect()`
+
+  Start trying to establish the WebRTC connection.
+
+- ### terminate
+
+  `.terminate()`
+
+  Terminates the WebRTC connection.
+
+- ### getStatus
+
+  `.getStatus()` 
+  
+  Retrieves the current connection status.
+
+- ### snapshot
+
+  `.snapshot(quality?: number)`
+
+   Requests a snapshot image from the server.
+
+  - `quality` - The range from `0` to `100`, determines the image quality. The default value is `30`.
+
+- ### toggleMic
+
+  `.toggleMic(enabled?: boolean)`
+
+  Toggles the **local** audio stream on or off. If an argument is provided, it will force the state to the specified value, otherwise, the current state will be toggled.
+
+- ### toggleSpeaker
+
+  `.toggleSpeaker(enabled?: boolean)`
+
+  Toggles the **remote** audio stream on or off. If an argument is provided, it will force the state to the specified value, otherwise, the current state will be toggled.
 
 # License
 

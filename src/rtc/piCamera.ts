@@ -19,29 +19,87 @@ export interface IPiCameraOptions extends IMqttConnectionOptions {
   turnPassword?: string;
   timeout?: number;
   datachannelOnly?: boolean;
-  defaultMicOn?: boolean;
-  defaultSpeakerOn?: boolean;
+  isMicOn?: boolean;
+  isSpeakerOn?: boolean;
 }
 
-export class PiCamera {
+interface IPiCamera {
+  // Events
   /**
-   * webrtc peer connection state changed event.
+   * Emitted when the WebRTC peer connection state changes.
+   *
+   * @param state - The new state of the RTCPeerConnection.
    */
   onConnectionState?: (state: RTCPeerConnectionState) => void;
 
   /**
-   * This event is triggered when the datachannel is opened.
+   * Emitted when the data channel is successfully opened.
+   *
+   * @param dataChannel - The opened RTCDataChannel instance for data communication.
    */
   onDatachannel?: (dataChannel: RTCDataChannel) => void;
 
   /**
-   * This event is triggered when the snapshot image is completely received.
+   * Emitted after calling the `snapshot()` method. This event emits a base64-encoded image 
+   * once all image packets are received from the server.
+   *
+   * @param base64 - The base64 string representing the captured image.
    */
   onSnapshot?: (base64: string) => void;
 
   /**
-   * The event is triggered if the connection is not connected in time. It'll execute terminate() afterward.
+   * Emitted when the P2P connection cannot be established within the allotted time. 
+   * Automatically triggers the `terminate()` function.
    */
+  onTimeout?: () => void;
+
+  // Methods
+  /**
+   * Attaches the remote media stream to the specified media element for playback.
+   *
+   * @param mediaElement - The HTML video element where the remote media stream will be rendered.
+   */
+  attach(mediaElement: HTMLVideoElement): void;
+
+  /**
+   * Start trying to establish the WebRTC connection.
+   */
+  connect(): void;
+
+  /**
+   * Terminates the WebRTC connection.
+   */
+  terminate(): void;
+
+  /**
+   * Retrieves the current connection status.
+   */
+  getStatus(): RTCPeerConnectionState;
+
+  /**
+   * Requests a snapshot image from the server.
+   * 
+   * @param quality - The range from `0` to `100`, determines the image quality. The default value is `30`.
+   */
+  snapshot(quality?: number): void;
+
+  /**
+   * Toggles the **local** audio stream on or off. If an argument is provided, it will force the state to the specified value, otherwise, the current state will be toggled.
+   * @param enabled 
+   */
+  toggleMic(enabled?: boolean): void;
+
+  /**
+   * Toggles the **remote** audio stream on or off. If an argument is provided, it will force the state to the specified value, otherwise, the current state will be toggled.
+   * @param enabled
+   */
+  toggleSpeaker(enabled?: boolean): void;
+}
+
+export class PiCamera implements IPiCamera {
+  onConnectionState?: (state: RTCPeerConnectionState) => void;
+  onDatachannel?: (dataChannel: RTCDataChannel) => void;
+  onSnapshot?: (base64: string) => void;
   onTimeout?: () => void;
 
   private options: IPiCameraOptions;
@@ -92,7 +150,7 @@ export class PiCamera {
         this.onTimeout();
       }
       this.terminate();
-    }, this.options.timeout ?? DEFAULT_TIMEOUT);
+    }, this.options.timeout);
   }
 
   terminate = () => {
@@ -130,15 +188,19 @@ export class PiCamera {
       this.mqttClient.disconnect();
       this.mqttClient = undefined;
     }
+
+    if (this.onConnectionState) {
+      this.onConnectionState('closed');
+    }
   }
 
-  getStatus = (): RTCPeerConnectionState | void => {
-    return this.rtcPeer?.connectionState;
+  getStatus = (): RTCPeerConnectionState => {
+    if (!this.rtcPeer) {
+      return 'new';
+    }
+    return this.rtcPeer.connectionState;
   }
 
-  /**
-   * require a jpeg image in quility between 0 to 100 (lower to higher).
-   */
   snapshot = (quality: number = 30) => {
     if (this.dataChannel?.readyState === 'open') {
       quality = Math.max(0, Math.min(quality, 100));
@@ -147,32 +209,32 @@ export class PiCamera {
     }
   }
 
-  toggleMic = (enabled = true) => {
-    if (this.localStream) {
-      this.localStream.getAudioTracks().forEach((track) => {
-        track.enabled = enabled;
-      });
+  toggleMic = (enabled: boolean = !this.options.isMicOn) => {
+    this.options.isMicOn = enabled;
+    this.toggleTrack(this.options.isMicOn, this.localStream);
+  };
+
+  toggleSpeaker = (enabled: boolean = !this.options.isSpeakerOn) => {
+    this.options.isSpeakerOn = enabled;
+    this.toggleTrack(this.options.isSpeakerOn, this.remoteStream);
+
+    if (this.mediaElement) {
+      this.mediaElement.muted = !this.options.isSpeakerOn;
     }
   };
 
-  toggleSpeaker = (enabled = true) => {
-    if (this.remoteStream) {
-      this.remoteStream.getAudioTracks().forEach((track) => {
-        track.enabled = enabled;
-      });
-    }
-
-    if (this.mediaElement) {
-      this.mediaElement.muted = !enabled;
-    }
+  private toggleTrack = (isOn: boolean, stream?: MediaStream) => {
+    stream?.getAudioTracks().forEach((track) => {
+      track.enabled = isOn;
+    });
   };
 
   private initializeOptions(userOptions: IPiCameraOptions): IPiCameraOptions {
     const defaultOptions = {
       timeout: DEFAULT_TIMEOUT,
       datachannelOnly: false,
-      defaultMicOn: true,
-      defaultSpeakerOn: true,
+      isMicOn: true,
+      isSpeakerOn: true,
     };
 
     return { ...defaultOptions, ...userOptions };
@@ -209,7 +271,7 @@ export class PiCamera {
 
       this.localStream.getAudioTracks().forEach(track => {
         peer.addTrack(track, this.localStream!);
-        track.enabled = this.options.defaultMicOn ?? false;
+        track.enabled = this.options.isMicOn ?? false;
       });
       peer.addTransceiver("video", { direction: "recvonly" });
       peer.addTransceiver("audio", { direction: "sendrecv" });
@@ -219,7 +281,7 @@ export class PiCamera {
         e.streams[0].getTracks().forEach((track) => {
           this.remoteStream?.addTrack(track);
           if (track.kind === "audio") {
-            track.enabled = this.options.defaultSpeakerOn ?? false;
+            track.enabled = this.options.isSpeakerOn ?? false;
           }
         });
 
