@@ -77,7 +77,7 @@ conn.connect();
 
 ## Options
 
-Available flags for initiazation.
+Available flags for initialization.
 
 | Option          | Type      | Default | Description                                                                        |
 |-----------------|-----------|---------|------------------------------------------------------------------------------------|
