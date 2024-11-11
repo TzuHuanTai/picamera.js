@@ -77,7 +77,7 @@ conn.connect();
 
 ## Options
 
-Available flags for initiazation.
+Available flags for initialization.
 
 | Option          | Type      | Default | Description                                                                        |
 |-----------------|-----------|---------|------------------------------------------------------------------------------------|
@@ -85,6 +85,7 @@ Available flags for initiazation.
 | mqttHost        | `string`  |         | The MQTT server host.                                                              |
 | mqttPath        | `string`  | `/mqtt` | The MQTT server path.                                                              |
 | mqttPort        | `number`  | `8884`  | The WebSocket port for the MQTT server.                                            |
+| mqttProtocol    | `string`  | `wss`   | The portocol for the MQTT server.                                                  |
 | mqttUsername    | `string`  |         | The username for the MQTT server.                                                  |
 | mqttPassword    | `string`  |         | The password for the MQTT server.                                                  |
 | stunUrls        | `string[]`|         | An array of STUN server URLs for WebRTC.                                           |
@@ -170,11 +171,11 @@ Available flags for initiazation.
 
 # License
 
-This project is licensed under the [AGPL-3.0-only](https://www.gnu.org/licenses/agpl-3.0.html) license. Under this license, anyone is free to use, modify, and distribute the code, but any use in network services or any modifications require the source code to be made public.
+This project is licensed under the [AGPL-3.0-only](https://www.gnu.org/licenses/agpl-3.0.html) license. Under this license, anyone is free to use, modify, and distribute the code, but any use in network services or any modifications require the source code to be made public. Commercial usage without source code disclosure is not permitted.
 
 ### Commercial License
 
-If your use case does not permit source code disclosure or you have other licensing requirements, a commercial license is available. This option exempts you from AGPL's source code sharing requirements and provides dedicated support. The commercial license also includes optional features, such as removing the watermark or enabling additional existing functionalities.
+If your use case does not permit source code disclosure or you have other licensing requirements, a commercial license is available. This option exempts you from the AGPL's source code sharing requirements and includes dedicated support. The commercial license also enables optional features, such as removing watermarks or unlocking additional functionalities.
 
 For more information, please contact:
 📧 Email: [tzu.huan.tai@gmail.com](mailto:tzu.huan.tai@gmail.com)

@@ -231,11 +231,13 @@ export class PiCamera implements IPiCamera {
 
   private initializeOptions(userOptions: IPiCameraOptions): IPiCameraOptions {
     const defaultOptions = {
+      mqttProtocol: 'wss',
+      mqttPath: '',
       timeout: DEFAULT_TIMEOUT,
       datachannelOnly: false,
       isMicOn: true,
       isSpeakerOn: true,
-    };
+    } as IPiCameraOptions;
 
     return { ...defaultOptions, ...userOptions };
   }
