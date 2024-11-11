@@ -6,6 +6,7 @@ export interface IMqttConnectionOptions {
   mqttHost: string;
   mqttPath: string;
   mqttPort: number;
+  mqttProtocol?: mqtt.MqttProtocol;
   mqttUsername: string;
   mqttPassword: string;
 }
@@ -32,7 +33,7 @@ export class MqttClient {
       clientId: this.clientId,
       username: this.options.mqttUsername,
       password: this.options.mqttPassword,
-      protocol: 'wss',
+      protocol: this.options.mqttProtocol,
       keepalive: 20,
       protocolVersion: 5,
       clean: true,
