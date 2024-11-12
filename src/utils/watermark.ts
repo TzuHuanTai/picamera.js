@@ -2,6 +2,11 @@ export function addWatermarkToStream(
   stream: MediaStream,
   watermarkText: string
 ): MediaStream {
+
+  if (!('MediaStreamTrackProcessor' in window) || !('MediaStreamTrackGenerator' in window)) {
+    console.warn('Browser does not fully support necessary APIs for watermarking.');
+    return stream;
+  }
   const videoTrack = stream.getVideoTracks()[0];
 
   // @ts-ignore
