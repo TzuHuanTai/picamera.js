@@ -246,7 +246,9 @@ export class PiCamera implements IPiCamera {
     let config: RTCConfiguration = {};
     config.iceServers = [];
     config.iceCandidatePoolSize = 10;
-    config.iceServers.push({ urls: this.options.stunUrls });
+    if (this.options.stunUrls && this.options.stunUrls.length > 0) {
+      config.iceServers.push({ urls: this.options.stunUrls });
+    }
 
     if (this.options.turnUrl && this.options.turnUsername && this.options.turnPassword) {
       config.iceServers.push({
