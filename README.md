@@ -27,7 +27,7 @@ Display live streaming on the HTML `<video>` element.
 
 ```html
 <video id="videoElement"></video>
-<script>
+<script type="module">
   import { PiCamera } from 'picamera.js';
 
   let videoRef = document.getElementById('videoElement');
