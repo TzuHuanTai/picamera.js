@@ -9,31 +9,41 @@ This package provides the JavaScript client-side implementation for [pi_webrtc](
 
 # Demo
 
-https://tzuhuantai.github.io/PiCamera.js/demo/
+Try it out: https://tzuhuantai.github.io/PiCamera.js/demo/
+
+You can find the source code here: [index.html](demo/index.html)
 
 # Installation
+
 ```
 npm install picamera.js
 ```
+
 # Example
+
 ### Live video
+
 Display live streaming on the HTML `<video>` element.
-```javascript
-import { PiCamera } from 'picamera.js';
 
-let videoRef = document.getElementById('videoElement');
+```html
+<video id="videoElement"></video>
+<script>
+  import { PiCamera } from 'picamera.js';
 
-let conn = new PiCamera({
-  deviceUid: 'your-custom-uid',
-  mqttHost: 'your.mqtt.cloud',
-  mqttPath: '/mqtt',
-  mqttPort: '8884', // Websocket Port
-  mqttUsername: 'hakunamatata',
-  mqttPassword: 'Wonderful',
-  stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
-});
-conn.attach(videoRef);
-conn.connect();
+  let videoRef = document.getElementById('videoElement');
+
+  let conn = new PiCamera({
+    deviceUid: 'your-custom-uid',
+    mqttHost: 'your.mqtt.cloud',
+    mqttPath: '/mqtt',
+    mqttPort: '8884', // Websocket Port
+    mqttUsername: 'hakunamatata',
+    mqttPassword: 'Wonderful',
+    stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
+  });
+  conn.attach(videoRef);
+  conn.connect();
+</script>
 ```
 
 ### Capture a snapshot
