@@ -93,23 +93,23 @@ conn.connect();
 
 Available flags for initialization.
 
-| Option          | Type      | Default | Description                                                                        |
-|-----------------|-----------|---------|------------------------------------------------------------------------------------|
-| deviceUid       | `string`  |         | The custom `--uid` provided in the running `pi_webrtc`.                            |
-| mqttHost        | `string`  |         | The MQTT server host.                                                              |
-| mqttPath        | `string`  | `/mqtt` | The MQTT server path.                                                              |
-| mqttPort        | `number`  | `8884`  | The WebSocket port for the MQTT server.                                            |
-| mqttProtocol    | `string`  | `wss`   | The portocol for the MQTT server.                                                  |
-| mqttUsername    | `string`  |         | The username for the MQTT server.                                                  |
-| mqttPassword    | `string`  |         | The password for the MQTT server.                                                  |
-| stunUrls        | `string[]`|         | An array of STUN server URLs for WebRTC.                                           |
-| turnUrl         | `string`  |         | The TURN server URL for WebRTC.                                                    |
-| turnUsername    | `string`  |         | The username for the TURN server.                                                  |
-| turnPassword    | `string`  |         | The password for the TURN server.                                                  |
-| timeout         | `number`  | `10000` | The connection timeout in milliseconds (`ms`).                                     |
-| datachannelOnly | `boolean` | `false` | Specifies that the connection is only for data transfer, without media streams.    |
-| isMicOn         | `boolean` | `true`  | Enables the local microphone stream by default if the connection is established.   |
-| isSpeakerOn     | `boolean` | `true`  | Enables the remote audio stream by default if the connection is established.       |
+| Option          | Type       | Default | Description                                                  |
+| --------------- | ---------- | ------- | ------------------------------------------------------------ |
+| deviceUid       | `string`   |         | The custom `--uid` provided in the running `pi_webrtc`.      |
+| mqttHost        | `string`   |         | The MQTT server host.                                        |
+| mqttPath        | `string`   | `/mqtt` | The MQTT server path.                                        |
+| mqttPort        | `number`   | `8884`  | The WebSocket port for the MQTT server.                      |
+| mqttProtocol    | `string`   | `wss`   | The portocol for the MQTT server.                            |
+| mqttUsername    | `string`   |         | The username for the MQTT server.                            |
+| mqttPassword    | `string`   |         | The password for the MQTT server.                            |
+| stunUrls        | `string[]` |         | An array of STUN server URLs for WebRTC. Leave out or set to null for local network or VPN IP addresses. |
+| turnUrl         | `string`   |         | The TURN server URL for WebRTC.                              |
+| turnUsername    | `string`   |         | The username for the TURN server.                            |
+| turnPassword    | `string`   |         | The password for the TURN server.                            |
+| timeout         | `number`   | `10000` | The connection timeout in milliseconds (`ms`).               |
+| datachannelOnly | `boolean`  | `false` | Specifies that the connection is only for data transfer, without media streams. |
+| isMicOn         | `boolean`  | `true`  | Enables the local microphone stream by default if the connection is established. |
+| isSpeakerOn     | `boolean`  | `true`  | Enables the remote audio stream by default if the connection is established. |
 
 ## Events
 - ### onConnectionState
