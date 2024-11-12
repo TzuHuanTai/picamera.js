@@ -7,6 +7,10 @@
 
 This package provides the JavaScript client-side implementation for [pi_webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC), a project designed to enable WebRTC-based real-time video and audio streaming on a Raspberry Pi.
 
+# Demo
+
+https://tzuhuantai.github.io/PiCamera.js/demo/
+
 # Installation
 ```
 npm install picamera.js
