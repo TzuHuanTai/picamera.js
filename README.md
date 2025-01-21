@@ -72,7 +72,112 @@ conn.onSnapshot = (image) => {
 conn.connect();
 ```
 
+# Notes on local IP or VPN address
+When running PiCamera.js over a local network or a VPN, set `stunUrls` to `null` or leave it out of the configuration altogether.
+
+# Notes on Mosquitto
+When running Mosquitto as your own MQTT server, we have experienced problems running Mosquitto with self-signed certificates with the MQTT client in PiCamera.js. Instead, run Mosquitto without SSL and then interpose nginx. For example:
+
+```
+# mosquitto.conf
+listener 1883 localhost
+allow_anonymous true
+
+listener 1884
+protocol websockets
+allow_anonymous true
+```
+
+Then interpose nginx's between the browser and Mosquitto. (This example assumes that the project files live in `/home/pi/src/project`, for example, with `run/` and `ssl/` and `logs/` and `dist/` subdirectories). It will run the secure port on 8443 (**not standard port 443!**). Change as you see fit -- this is for documentation purposes only.
+
+```nginx
+# nginx.conf
+pid /home/pi/src/project/run/nginx.pid;
+
+events {}
+
+http {
+  # Map to manage WebSocket upgrade headers
+  map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+  }
+
+  # Upstream definition for Mosquitto WebSocket listener
+  upstream mosquitto_websocket {
+    server localhost:1884;  # Mosquitto WebSocket listener
+  }
+
+  # HTTPS server
+  server {
+    listen 8443 ssl;
+    access_log /home/pi/src/project/logs/access.log;
+    error_log /home/pi/src/project/logs/error.log;
+
+    ssl_certificate /home/pi/src/project/ssl/server.crt;
+    ssl_certificate_key /home/pi/src/project/ssl/server.key;
+
+    location / {
+      root /home/pi/src/project/dist/;
+      try_files $uri $uri/ =404;
+    }
+
+    # Location block for WebSocket proxying to Mosquitto
+    location /mqtt {
+      proxy_pass http://mosquitto_websocket;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+  }
+
+  # HTTP server
+  server {
+    listen 8080;
+    access_log /home/pi/src/project/logs/access_http.log;
+    error_log /home/pi/src/project/logs/error_http.log;
+
+    location / {
+      root /home/pi/src/project/dist/;
+      try_files $uri $uri/ =404;
+    }
+
+    # Location block for WebSocket proxying to Mosquitto over HTTP
+    location /mqtt {
+      proxy_pass http://mosquitto_websocket;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+  }
+}
+```
+
+This example would require PiCamera.js to be initialized as
+
+```javascript
+let conn = new PiCamera({
+  deviceUid: 'some-unique-uuid',      // must match pi_webrtc's --uid argument
+  mqttHost: window.location.hostname, // same host and
+  mqttPort: window.location.port,     // port as page itself
+  mqttPath: '/mqtt',                  // to match nginx.conf configuration
+});
+```
+
+# Notes on self-signed certificates
+
+Most browsers require https for video to work. When using self-signed certificates, you first need to accept the browser's warning about the certificate. You also need to do this explicitly for the websocket host/port. In the above example, you would have to open https://your.mqtt.cloud:8884/ and accept the warning before the example works. Keep on eye on the browser's console to pick up on errors about self-signed certificates and open the `wss://` URLs it complains about as `https://` to accept the self-signed certificates.
+
 # API
+
 * [Options](#options)
 * [Events](#events)
   * [onConnectionState](#onConnectionState)
@@ -93,23 +198,23 @@ conn.connect();
 
 Available flags for initialization.
 
-| Option          | Type      | Default | Description                                                                        |
-|-----------------|-----------|---------|------------------------------------------------------------------------------------|
-| deviceUid       | `string`  |         | The custom `--uid` provided in the running `pi_webrtc`.                            |
-| mqttHost        | `string`  |         | The MQTT server host.                                                              |
-| mqttPath        | `string`  | `/mqtt` | The MQTT server path.                                                              |
-| mqttPort        | `number`  | `8884`  | The WebSocket port for the MQTT server.                                            |
-| mqttProtocol    | `string`  | `wss`   | The portocol for the MQTT server.                                                  |
-| mqttUsername    | `string`  |         | The username for the MQTT server.                                                  |
-| mqttPassword    | `string`  |         | The password for the MQTT server.                                                  |
-| stunUrls        | `string[]`|         | An array of STUN server URLs for WebRTC.                                           |
-| turnUrl         | `string`  |         | The TURN server URL for WebRTC.                                                    |
-| turnUsername    | `string`  |         | The username for the TURN server.                                                  |
-| turnPassword    | `string`  |         | The password for the TURN server.                                                  |
-| timeout         | `number`  | `10000` | The connection timeout in milliseconds (`ms`).                                     |
-| datachannelOnly | `boolean` | `false` | Specifies that the connection is only for data transfer, without media streams.    |
-| isMicOn         | `boolean` | `true`  | Enables the local microphone stream by default if the connection is established.   |
-| isSpeakerOn     | `boolean` | `true`  | Enables the remote audio stream by default if the connection is established.       |
+| Option          | Type       | Default | Description                                                  |
+| --------------- | ---------- | ------- | ------------------------------------------------------------ |
+| deviceUid       | `string`   |         | The custom `--uid` provided in the running `pi_webrtc`.      |
+| mqttHost        | `string`   |         | The MQTT server host.                                        |
+| mqttPath        | `string`   | `/mqtt` | The MQTT server path.                                        |
+| mqttPort        | `number`   | `8884`  | The WebSocket port for the MQTT server.                      |
+| mqttProtocol    | `string`   | `wss`   | The portocol for the MQTT server.                            |
+| mqttUsername    | `string`   |         | The username for the MQTT server.                            |
+| mqttPassword    | `string`   |         | The password for the MQTT server.                            |
+| stunUrls        | `string[]` |         | An array of STUN server URLs for WebRTC. Leave out or set to null for local network or VPN IP addresses. |
+| turnUrl         | `string`   |         | The TURN server URL for WebRTC.                              |
+| turnUsername    | `string`   |         | The username for the TURN server.                            |
+| turnPassword    | `string`   |         | The password for the TURN server.                            |
+| timeout         | `number`   | `10000` | The connection timeout in milliseconds (`ms`).               |
+| datachannelOnly | `boolean`  | `false` | Specifies that the connection is only for data transfer, without media streams. |
+| isMicOn         | `boolean`  | `true`  | Enables the local microphone stream by default if the connection is established. |
+| isSpeakerOn     | `boolean`  | `true`  | Enables the remote audio stream by default if the connection is established. |
 
 ## Events
 - ### onConnectionState
