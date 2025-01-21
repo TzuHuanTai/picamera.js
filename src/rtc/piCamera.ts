@@ -341,6 +341,14 @@ export class PiCamera implements IPiCamera {
       }
     });
 
+    peer.addEventListener("icegatheringstatechange", e => {
+      console.debug("peer.iceGatheringState: ", peer.iceGatheringState);
+
+      if (peer.iceGatheringState === "complete") {
+        console.debug("peer.localDescription: ", peer.localDescription);
+      }
+    });
+
     return peer;
   }
 
