@@ -215,6 +215,7 @@ Available flags for initialization.
 | datachannelOnly | `boolean`  | `false` | Specifies that the connection is only for data transfer, without media streams. |
 | isMicOn         | `boolean`  | `true`  | Enables the local microphone stream by default if the connection is established. |
 | isSpeakerOn     | `boolean`  | `true`  | Enables the remote audio stream by default if the connection is established. |
+| credits         | `boolean`  | `true`  | Show watermark to run it under credits.                      |
 
 ## Events
 - ### onConnectionState

@@ -21,6 +21,7 @@ export interface IPiCameraOptions extends IMqttConnectionOptions {
   datachannelOnly?: boolean;
   isMicOn?: boolean;
   isSpeakerOn?: boolean;
+  credits?: boolean;
 }
 
 interface IPiCamera {
@@ -237,6 +238,7 @@ export class PiCamera implements IPiCamera {
       datachannelOnly: false,
       isMicOn: true,
       isSpeakerOn: true,
+      credits: true,
     } as IPiCameraOptions;
 
     return { ...defaultOptions, ...userOptions };
@@ -290,10 +292,10 @@ export class PiCamera implements IPiCamera {
         });
 
         if (this.mediaElement) {
-          this.mediaElement.srcObject =
+          this.mediaElement.srcObject = this.options.credits ?
             addWatermarkToStream(
               this.remoteStream, 'github.com/TzuHuanTai'
-            );
+            ) : this.remoteStream;
         }
       });
     }
@@ -368,7 +370,7 @@ export class PiCamera implements IPiCamera {
       this.isFirstPacket = true;
       addWatermarkToImage(
         "data:image/jpeg;base64," + arrayBufferToBase64(this.completeFile),
-        'github.com/TzuHuanTai').then(base64Image => {
+        this.options.credits ? 'github.com/TzuHuanTai' : '').then(base64Image => {
           if (this.onSnapshot) {
             this.onSnapshot(base64Image);
           }
