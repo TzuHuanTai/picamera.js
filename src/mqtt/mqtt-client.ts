@@ -1,5 +1,5 @@
 import mqtt, { MqttClient as MqttLibClient, IClientOptions } from 'mqtt';
-import { generateUid } from '../rtc/rtcUtils';
+import { generateUid } from '../rtc/rtc-utils';
 
 export interface IMqttConnectionOptions {
   deviceUid: string;

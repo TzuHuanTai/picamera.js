@@ -1,5 +1,5 @@
-import { MqttClient } from './mqtt/mqttClient';
-import { PiCamera, IPiCameraOptions } from './rtc/piCamera';
+import { MqttClient } from './mqtt/mqtt-client';
+import { PiCamera, IPiCameraOptions } from './rtc/pi-camera';
 
 export {
   PiCamera,
