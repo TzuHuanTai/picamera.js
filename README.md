@@ -216,6 +216,7 @@ Available flags for initialization.
 | isMicOn         | `boolean`  | `true`  | Enables the local microphone stream by default if the connection is established. |
 | isSpeakerOn     | `boolean`  | `true`  | Enables the remote audio stream by default if the connection is established. |
 | credits         | `boolean`  | `true`  | Show watermark to run it under credits.                      |
+| codec           | `string`   | `VP8`   | Codecs include `H264`, `VP8`, `VP9`, and `AV1`.              |
 
 ## Events
 - ### onConnectionState

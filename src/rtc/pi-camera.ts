@@ -2,10 +2,12 @@ import { IMqttConnectionOptions, MqttClient } from '../mqtt/mqtt-client';
 import {
   arrayBufferToBase64,
   arrayBufferToString,
+  CodecType,
   CommandType,
   generateUid,
-  RtcMessage
-} from './rtc-utils';
+  RtcMessage,
+  keepOnlyCodec
+} from '../utils/rtc-tools';
 import { addWatermarkToImage, addWatermarkToStream } from '../utils/watermark';
 
 const MQTT_SDP_TOPIC: string = "sdp";
@@ -22,6 +24,7 @@ export interface IPiCameraOptions extends IMqttConnectionOptions {
   isMicOn?: boolean;
   isSpeakerOn?: boolean;
   credits?: boolean;
+  codec?: CodecType;
 }
 
 interface IPiCamera {
@@ -134,6 +137,11 @@ export class PiCamera implements IPiCamera {
       conn.subscribe(MQTT_ICE_TOPIC, this.handleIceMessage);
 
       const offer = await this.rtcPeer.createOffer({});
+
+      if (this.options.codec && offer.sdp) {
+        offer.sdp = keepOnlyCodec(offer.sdp, this.options.codec);
+      }
+
       this.rtcPeer?.setLocalDescription(offer);
       conn.publish(MQTT_SDP_TOPIC, JSON.stringify(offer));
     }
@@ -239,6 +247,7 @@ export class PiCamera implements IPiCamera {
       isMicOn: true,
       isSpeakerOn: true,
       credits: true,
+      codec: 'VP8',
     } as IPiCameraOptions;
 
     return { ...defaultOptions, ...userOptions };
