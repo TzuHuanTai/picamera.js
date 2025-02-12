@@ -1,11 +1,11 @@
-import { IMqttConnectionOptions, MqttClient } from '../mqtt/mqttClient';
+import { IMqttConnectionOptions, MqttClient } from '../mqtt/mqtt-client';
 import {
   arrayBufferToBase64,
   arrayBufferToString,
   CommandType,
   generateUid,
   RtcMessage
-} from './rtcUtils';
+} from './rtc-utils';
 import { addWatermarkToImage, addWatermarkToStream } from '../utils/watermark';
 
 const MQTT_SDP_TOPIC: string = "sdp";
