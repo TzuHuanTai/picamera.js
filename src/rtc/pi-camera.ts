@@ -6,8 +6,10 @@ import {
   CommandType,
   generateUid,
   RtcMessage,
-  keepOnlyCodec
+  keepOnlyCodec,
+  CameraOptionMessage
 } from '../utils/rtc-tools';
+import { CameraOptionType, CameraOptionValue } from '../utils/camera-controls';
 import { addWatermarkToImage, addWatermarkToStream } from '../utils/watermark';
 
 const MQTT_SDP_TOPIC: string = "sdp";
@@ -79,6 +81,12 @@ interface IPiCamera {
    * Retrieves the current connection status.
    */
   getStatus(): RTCPeerConnectionState;
+
+  /** 
+   * @param key Camera Option Type
+   * @param value Value of the Camera Option
+   */
+  setCameraOption(key: CameraOptionType, value: CameraOptionValue): void;
 
   /**
    * Requests a snapshot image from the server.
@@ -208,6 +216,14 @@ export class PiCamera implements IPiCamera {
       return 'new';
     }
     return this.rtcPeer.connectionState;
+  }
+
+  setCameraOption = (key: CameraOptionType, value: CameraOptionValue) => {
+    if (this.dataChannel?.readyState === 'open') {
+      const option = new CameraOptionMessage(key, value);
+      const command = new RtcMessage(CommandType.CAMERA_CONTROL, JSON.stringify(option));
+      this.dataChannel.send(JSON.stringify(command));
+    }
   }
 
   snapshot = (quality: number = 30) => {
