@@ -1,8 +1,11 @@
+import { CameraOptionType, CameraOptionValue } from "./camera-controls";
+
 export enum CommandType {
   CONNECT,
   SNAPSHOT,
   METADATA,
   RECORD,
+  CAMERA_CONTROL,
   UNKNOWN
 };
 
@@ -29,6 +32,16 @@ export class MetaCmdMessage {
   constructor(command: MetadataCommand, message: string = "") {
     this.command = command;
     this.message = message;
+  }
+}
+
+export class CameraOptionMessage {
+  key: CameraOptionType;
+  value:CameraOptionValue;
+
+  constructor(key: CameraOptionType, value: CameraOptionValue) {
+    this.key = key;
+    this.value = value;
   }
 }
 
