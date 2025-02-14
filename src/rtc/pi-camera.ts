@@ -83,6 +83,7 @@ interface IPiCamera {
   getStatus(): RTCPeerConnectionState;
 
   /** 
+   * Sets the camera option, such as 3A or so.
    * @param key Camera Option Type
    * @param value Value of the Camera Option
    */
