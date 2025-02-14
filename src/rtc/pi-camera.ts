@@ -264,7 +264,6 @@ export class PiCamera implements IPiCamera {
       isMicOn: true,
       isSpeakerOn: true,
       credits: true,
-      codec: 'VP8',
     } as IPiCameraOptions;
 
     return { ...defaultOptions, ...userOptions };
