@@ -21,15 +21,64 @@ npm install picamera.js
 
 # Example
 
-### Live video
+- ### Live video
 
-Display live streaming on the HTML `<video>` element.
+  Display live streaming on the HTML `<video>` element.
 
-```html
-<video id="videoElement"></video>
-<script type="module">
-  import { PiCamera } from 'picamera.js';
+  ```html
+  <video id="videoElement"></video>
+  <script type="module">
+    import { PiCamera } from 'picamera.js';
 
+    let videoRef = document.getElementById('videoElement');
+
+    let conn = new PiCamera({
+      deviceUid: 'your-custom-uid',
+      mqttHost: 'your.mqtt.cloud',
+      mqttPath: '/mqtt',
+      mqttPort: '8884', // Websocket Port
+      mqttUsername: 'hakunamatata',
+      mqttPassword: 'Wonderful',
+      stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
+    });
+    conn.attach(videoRef);
+    conn.connect();
+  </script>
+  ```
+
+- ### Capture a snapshot only
+
+  Use webrtc datachannel to get the snapshot image only.
+
+  ```javascript
+  let conn = new PiCamera({
+    deviceUid: 'your-custom-uid',
+    mqttHost: 'your.mqtt.cloud',
+    mqttPath: '/mqtt',
+    mqttPort: '8884', // Websocket Port
+    mqttUsername: 'hakunamatata',
+    mqttPassword: 'Wonderful',
+    stunUrls: ["stun:stun1.l.google.com:19302"],
+    datachannelOnly: true,
+  });
+
+  conn.onDatachannel = (dc) => {
+    conn.snapshot();
+  }
+
+  conn.onSnapshot = (image) => {
+    // get a base64 image here, then terminate the connection.
+    conn.terminate();
+  }
+
+  conn.connect();
+  ```
+
+- ### Set camera options while streaming.
+
+  This example only set auto-focus and auto white balance. Other options see `CameraOptionType`.
+
+  ```javascript
   let videoRef = document.getElementById('videoElement');
 
   let conn = new PiCamera({
@@ -41,36 +90,20 @@ Display live streaming on the HTML `<video>` element.
     mqttPassword: 'Wonderful',
     stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
   });
+    
   conn.attach(videoRef);
   conn.connect();
-</script>
-```
 
-### Capture a snapshot
-Use webrtc datachannel to get the snapshot image only.
-```javascript
-let conn = new PiCamera({
-  deviceUid: 'your-custom-uid',
-  mqttHost: 'your.mqtt.cloud',
-  mqttPath: '/mqtt',
-  mqttPort: '8884', // Websocket Port
-  mqttUsername: 'hakunamatata',
-  mqttPassword: 'Wonderful',
-  stunUrls: ["stun:stun1.l.google.com:19302"],
-  datachannelOnly: true,
-});
+  // click the button with onclick="setAwb()" when it's connected
+  setAwb = () => {
+    conn.setCameraOption(CameraOptionType.AWB_MODE, AwbModeEnum.AwbCloudy);
+  }
 
-conn.onDatachannel = (dc) => {
-  conn.snapshot();
-}
-
-conn.onSnapshot = (image) => {
-  // get a base64 image here, then terminate the connection.
-  conn.terminate();
-}
-
-conn.connect();
-```
+  // click the button with onclick="setCameraOption()" when it's connected
+  setAf = () => {
+    conn.setCameraOption(CameraOptionType.AF_MODE, AfModeEnum.AfModeContinuous);
+  }
+  ```
 
 # Notes on local IP or VPN address
 When running PiCamera.js over a local network or a VPN, set `stunUrls` to `null` or leave it out of the configuration altogether.
@@ -269,6 +302,12 @@ Available flags for initialization.
   `.getStatus()` 
   
   Retrieves the current connection status.
+
+- ### setCameraOption
+
+  `.setCameraOption(key: CameraOptionType, value: CameraOptionValue)` 
+  
+  Sets the camera option, such as 3A or so.
 
 - ### snapshot
 
