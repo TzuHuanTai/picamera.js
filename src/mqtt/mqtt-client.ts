@@ -1,15 +1,6 @@
 import mqtt, { MqttClient as MqttLibClient, IClientOptions } from 'mqtt';
 import { generateUid } from '../utils/rtc-tools';
-
-export interface IMqttConnectionOptions {
-  deviceUid: string;
-  mqttHost: string;
-  mqttPath: string;
-  mqttPort: number;
-  mqttProtocol?: mqtt.MqttProtocol;
-  mqttUsername: string;
-  mqttPassword: string;
-}
+import { IMqttConnectionOptions } from './mqtt-client.interface';
 
 export class MqttClient {
   private options: IMqttConnectionOptions;
