@@ -1,7 +1,8 @@
 
 import { CodecType } from '../utils/rtc-tools';
-import { CameraOptionType, CameraOptionValue } from '../utils/camera-controls';
+import { CameraOptionType, CameraOptionValue } from './camera-options';
 import { IMqttConnectionOptions } from '../mqtt/mqtt-client.interface';
+import { VideoMetadata } from './message';
 
 export interface IPiCameraOptions extends IMqttConnectionOptions {
   stunUrls: string[];
@@ -41,6 +42,13 @@ export interface IPiCamera {
   onSnapshot?: (base64: string) => void;
 
   /**
+   * Emitted when the metadata of a recording file is retrieved.
+   *
+   * @param metadata - The metadata of the recording file.
+   */
+  onMetadata?: (metadata: VideoMetadata) => void;
+
+  /**
    * Emitted when the P2P connection cannot be established within the allotted time. 
    * Automatically triggers the `terminate()` function.
    */
@@ -68,6 +76,19 @@ export interface IPiCamera {
    * Retrieves the current connection status.
    */
   getStatus(): RTCPeerConnectionState;
+
+  /**
+  * Retrieves metadata of recording files.
+  * - If called without arguments, returns metadata of the latest recorded file.
+  * - If provided with a file path, returns metadata of up to 8 older recordings before the given file.
+  * - If provided with a date, returns metadata of the closest recorded file to that time.
+  * 
+  * @param path - The path to an existing recorded file; retrieves metadata of up to 8 older recordings before it.
+  * @param time - A specific date/time; retrieves metadata of the closest recorded file.
+  */
+  getRecordingMetadata(): void;
+  getRecordingMetadata(path: string): void;
+  getRecordingMetadata(time: Date): void;
 
   /** 
    * Sets the camera option, such as 3A or so.
