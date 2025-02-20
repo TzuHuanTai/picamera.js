@@ -1,50 +1,3 @@
-import { CameraOptionType, CameraOptionValue } from "./camera-controls";
-
-export enum CommandType {
-  CONNECT,
-  SNAPSHOT,
-  METADATA,
-  RECORD,
-  CAMERA_CONTROL,
-  UNKNOWN
-};
-
-export enum MetadataCommand {
-  LATEST,
-  OLDER,
-  SPECIFIC_TIME
-};
-
-export class RtcMessage {
-  type: CommandType;
-  message?: string;
-
-  constructor(type: CommandType, message: string | number) {
-    this.type = type;
-    this.message = typeof message === 'string' ? message : String(message);
-  }
-}
-
-export class MetaCmdMessage {
-  command: MetadataCommand;
-  message: string;
-
-  constructor(command: MetadataCommand, message: string = "") {
-    this.command = command;
-    this.message = message;
-  }
-}
-
-export class CameraOptionMessage {
-  key: CameraOptionType;
-  value:CameraOptionValue;
-
-  constructor(key: CameraOptionType, value: CameraOptionValue) {
-    this.key = key;
-    this.value = value;
-  }
-}
-
 export type CodecType = 'H264' | 'VP8' | 'VP9' | 'AV1';
 const ALLOWED_CODEC: CodecType = 'H264';
 const ALL_CODECS: CodecType[] = ['H264', 'VP8', 'VP9', 'AV1'];
@@ -160,4 +113,8 @@ export function generateUid(length: number): string {
     result += characters[randomIndex];
   }
   return result;
+}
+
+export const padZero = (num: number): string => {
+  return num.toString().padStart(2, '0');
 }
