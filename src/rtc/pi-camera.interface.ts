@@ -49,6 +49,13 @@ export interface IPiCamera {
   onMetadata?: (metadata: VideoMetadata) => void;
 
   /**
+   * Emitted when a video file is successfully downloaded from the server.
+   * @param file 
+   * @returns 
+   */
+  onVideoDownloaded?: (file:Blob) => void;
+
+  /**
    * Emitted when the P2P connection cannot be established within the allotted time. 
    * Automatically triggers the `terminate()` function.
    */
@@ -89,6 +96,13 @@ export interface IPiCamera {
   getRecordingMetadata(): void;
   getRecordingMetadata(path: string): void;
   getRecordingMetadata(time: Date): void;
+
+  /**
+   * Requests a video file from the server.
+   * 
+   * @param path - The path to the video file.
+   */
+  fetchRecordedVideo(path: string): void;
 
   /** 
    * Sets the camera option, such as 3A or so.

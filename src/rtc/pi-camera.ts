@@ -19,6 +19,7 @@ export class PiCamera implements IPiCamera {
   onDatachannel?: (dataChannel: RTCDataChannel) => void;
   onSnapshot?: (base64: string) => void;
   onMetadata?: ((metadata: VideoMetadata) => void);
+  onVideoDownloaded?: ((file: Blob) => void);
   onTimeout?: () => void;
 
   private options: IPiCameraOptions;
@@ -136,6 +137,13 @@ export class PiCamera implements IPiCamera {
       }
 
       const command = new RtcMessage(CommandType.METADATA, metaCmd.ToString());
+      this.dataChannel.send(command.ToString());
+    }
+  }
+
+  fetchRecordedVideo(path: string): void {
+    if (this.onVideoDownloaded && this.dataChannel?.readyState === 'open') {
+      const command = new RtcMessage(CommandType.RECORD, path);
       this.dataChannel.send(command.ToString());
     }
   }
@@ -276,6 +284,9 @@ export class PiCamera implements IPiCamera {
         case CommandType.METADATA:
           this.metadataReceiver.receiveData(body);
           break;
+        case CommandType.RECORD:
+          this.recordReceiver.receiveData(body);
+          break;
       }
     });
 
@@ -320,6 +331,13 @@ export class PiCamera implements IPiCamera {
 
     if (this.onMetadata) {
       this.onMetadata(parsedBody);
+    }
+  });
+
+  private recordReceiver = new DataChannelReceiver((body) => {
+    if (this.onVideoDownloaded) {
+      const blob = new Blob([body], { type: 'video/mp4' });
+      this.onVideoDownloaded(blob);
     }
   });
 
