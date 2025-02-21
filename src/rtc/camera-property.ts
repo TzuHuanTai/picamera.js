@@ -1,5 +1,5 @@
 
-export enum CameraOptionType {
+export enum CameraPropertyType {
 	AE_ENABLE = 1,
 	AE_LOCKED = 2,
 	AE_METERING_MODE = 3,
@@ -146,4 +146,4 @@ export enum HdrChannelEnum {
 	HdrChannelLong = 3,
 };
 
-export type CameraOptionValue = HdrChannelEnum | HdrModeEnum | AfPauseStateEnum | AfStateEnum | AfPauseEnum | AfTriggerEnum | AfMeteringEnum | AfSpeedEnum | AfRangeEnum | AfModeEnum | AwbModeEnum | AeFlickerModeEnum | AeExposureModeEnum | AeConstraintModeEnum | AeMeteringModeEnum;
+export type CameraPropertyValue = HdrChannelEnum | HdrModeEnum | AfPauseStateEnum | AfStateEnum | AfPauseEnum | AfTriggerEnum | AfMeteringEnum | AfSpeedEnum | AfRangeEnum | AfModeEnum | AwbModeEnum | AeFlickerModeEnum | AeExposureModeEnum | AeConstraintModeEnum | AeMeteringModeEnum;

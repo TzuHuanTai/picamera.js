@@ -8,9 +8,9 @@ import {
 } from '../utils/rtc-tools';
 import { CommandType, MetadataCommand } from './command';
 import { DEFAULT_TIMEOUT, MQTT_ICE_TOPIC, MQTT_SDP_TOPIC } from '../constants';
-import { CameraOptionMessage, MetaCmdMessage, RtcMessage, VideoMetadata } from './message';
+import { CameraCtlMessage, MetaCmdMessage, RtcMessage, VideoMetadata } from './message';
 import { IPiCamera, IPiCameraOptions } from './pi-camera.interface';
-import { CameraOptionType, CameraOptionValue } from './camera-options';
+import { CameraPropertyType, CameraPropertyValue } from './camera-property';
 import { addWatermarkToImage, addWatermarkToStream } from '../utils/watermark';
 import { DataChannelReceiver } from './datachannel-receiver';
 
@@ -148,10 +148,10 @@ export class PiCamera implements IPiCamera {
     }
   }
 
-  setCameraOption = (key: CameraOptionType, value: CameraOptionValue) => {
+  setCameraProperty = (key: CameraPropertyType, value: CameraPropertyValue) => {
     if (this.dataChannel?.readyState === 'open') {
-      const option = new CameraOptionMessage(key, value);
-      const command = new RtcMessage(CommandType.CAMERA_CONTROL, JSON.stringify(option));
+      const ctl = new CameraCtlMessage(key, value);
+      const command = new RtcMessage(CommandType.CAMERA_CONTROL, JSON.stringify(ctl));
       this.dataChannel.send(command.ToString());
     }
   }

@@ -1,4 +1,4 @@
-import { CameraOptionType, CameraOptionValue } from "./camera-options";
+import { CameraPropertyType, CameraPropertyValue } from "./camera-property";
 import { CommandType, MetadataCommand } from "./command";
 
 export class RtcMessage {
@@ -35,11 +35,11 @@ export type VideoMetadata = {
   path: string;
 }
 
-export class CameraOptionMessage {
-  key: CameraOptionType;
-  value: CameraOptionValue;
+export class CameraCtlMessage {
+  key: CameraPropertyType;
+  value: CameraPropertyValue;
 
-  constructor(key: CameraOptionType, value: CameraOptionValue) {
+  constructor(key: CameraPropertyType, value: CameraPropertyValue) {
     this.key = key;
     this.value = value;
   }

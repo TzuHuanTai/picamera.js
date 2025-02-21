@@ -74,9 +74,9 @@ npm install picamera.js
   conn.connect();
   ```
 
-- ### Set camera options while streaming.
+- ### Set camera properties while streaming.
 
-  This example only set auto-focus and auto white balance. Other options see `CameraOptionType`.
+  This example only set auto-focus and auto white balance. Other properties see `CameraPropertyType`.
 
   ```javascript
   let videoRef = document.getElementById('videoElement');
@@ -96,12 +96,12 @@ npm install picamera.js
 
   // click the button with onclick="setAwb()" when it's connected
   setAwb = () => {
-    conn.setCameraOption(CameraOptionType.AWB_MODE, AwbModeEnum.AwbCloudy);
+    conn.setCameraProperty(CameraPropertyType.AWB_MODE, AwbModeEnum.AwbCloudy);
   }
 
-  // click the button with onclick="setCameraOption()" when it's connected
+  // click the button with onclick="setAf()" when it's connected
   setAf = () => {
-    conn.setCameraOption(CameraOptionType.AF_MODE, AfModeEnum.AfModeContinuous);
+    conn.setCameraProperty(CameraPropertynType.AF_MODE, AfModeEnum.AfModeContinuous);
   }
   ```
 
@@ -303,11 +303,11 @@ Available flags for initialization.
   
   Retrieves the current connection status.
 
-- ### setCameraOption
+- ### setCameraProperty
 
-  `.setCameraOption(key: CameraOptionType, value: CameraOptionValue)` 
+  `.setCameraProperty(key: CameraPropertyType, value: CameraPropertyValue)` 
   
-  Sets the camera option, such as 3A or so.
+  Sets camera properties, such as 3A or so.
 
 - ### snapshot
 

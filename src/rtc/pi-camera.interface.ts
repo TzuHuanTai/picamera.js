@@ -1,6 +1,6 @@
 
 import { CodecType } from '../utils/rtc-tools';
-import { CameraOptionType, CameraOptionValue } from './camera-options';
+import { CameraPropertyType, CameraPropertyValue } from './camera-property';
 import { IMqttConnectionOptions } from '../mqtt/mqtt-client.interface';
 import { VideoMetadata } from './message';
 
@@ -105,11 +105,11 @@ export interface IPiCamera {
   fetchRecordedVideo(path: string): void;
 
   /** 
-   * Sets the camera option, such as 3A or so.
-   * @param key Camera Option Type
-   * @param value Value of the Camera Option
+   * Sets the camera property, such as 3A or so.
+   * @param key Camera property type
+   * @param value Value of the camera property
    */
-  setCameraOption(key: CameraOptionType, value: CameraOptionValue): void;
+  setCameraProperty(key: CameraPropertyType, value: CameraPropertyValue): void;
 
   /**
    * Requests a snapshot image from the server.
