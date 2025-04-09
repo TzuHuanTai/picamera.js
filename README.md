@@ -9,7 +9,7 @@ This package provides the JavaScript client-side implementation for [pi_webrtc](
 
 # Demo
 
-Try it out: https://tzuhuantai.github.io/PiCamera.js/demo/
+Try it out: https://tzuhuantai.github.io/picamera.js/demo/
 
 You can find the source code here: [index.html](demo/index.html)
 
