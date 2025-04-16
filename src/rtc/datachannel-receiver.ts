@@ -4,9 +4,9 @@ export class DataChannelReceiver {
   private receivedLength: number;
   private isFirstPacket: boolean;
   private fileBuffer: Uint8Array;
-  private onComplete: (body: Uint8Array) => void;
+  private onComplete: (received: number, body: Uint8Array) => void;
 
-  constructor(onComplete: (body: Uint8Array) => void) {
+  constructor(onComplete: (progress: number, body: Uint8Array) => void) {
     this.onComplete = onComplete;
     this.fileBuffer = new Uint8Array();
     this.receivedLength = 0;
@@ -17,14 +17,12 @@ export class DataChannelReceiver {
     if (this.isFirstPacket) {
       this.fileBuffer = new Uint8Array(Number(arrayBufferToString(packet)));
       this.isFirstPacket = false;
+    } else if (packet.length === 0) {
+      this.reset();
     } else {
       this.fileBuffer.set(packet, this.receivedLength);
       this.receivedLength += packet.length;
-    }
-
-    if (packet.length === 0) {
-      this.onComplete(this.fileBuffer);
-      this.reset();
+      this.onComplete(this.receivedLength, this.fileBuffer);
     }
   }
 

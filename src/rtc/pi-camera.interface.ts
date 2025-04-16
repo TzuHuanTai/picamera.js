@@ -3,6 +3,7 @@ import { CodecType } from '../utils/rtc-tools';
 import { CameraPropertyType, CameraPropertyValue } from './camera-property';
 import { IMqttConnectionOptions } from '../mqtt/mqtt-client.interface';
 import { VideoMetadata } from './message';
+import { CommandType } from './command';
 
 export interface IPiCameraOptions extends IMqttConnectionOptions {
   stunUrls: string[];
@@ -17,8 +18,7 @@ export interface IPiCameraOptions extends IMqttConnectionOptions {
   codec?: CodecType;
 }
 
-export interface IPiCamera {
-  // Events
+export interface IPiCameraEvents {
   /**
    * Emitted when the WebRTC peer connection state changes.
    *
@@ -32,6 +32,20 @@ export interface IPiCamera {
    * @param dataChannel - The opened RTCDataChannel instance for data communication.
    */
   onDatachannel?: (dataChannel: RTCDataChannel | any) => void;
+
+  /**
+   * If any data transfer by datachannel, the on progress will give the received/total info.
+   * @param received 
+   * @param total 
+   */
+  onProgress?: (received: number, total: number, type: CommandType) => void;
+
+  /**
+   * Attaches the remote media stream to the specified media element for playback.
+   *
+   * @param stream - The HTML video element where the remote media stream will be rendered.
+   */
+  onStream?: (stream: MediaStream | undefined) => void;
 
   /**
    * Emitted after calling the `snapshot()` method. This event emits a base64-encoded image 
@@ -53,22 +67,16 @@ export interface IPiCamera {
    * @param file 
    * @returns 
    */
-  onVideoDownloaded?: (file:Blob) => void;
+  onVideoDownloaded?: (file: Uint8Array) => void;
 
   /**
    * Emitted when the P2P connection cannot be established within the allotted time. 
    * Automatically triggers the `terminate()` function.
    */
   onTimeout?: () => void;
+}
 
-  // Methods
-  /**
-   * Attaches the remote media stream to the specified media element for playback.
-   *
-   * @param mediaElement - The HTML video element where the remote media stream will be rendered.
-   */
-  attach(mediaElement: HTMLVideoElement | any): void;
-
+export interface IPiCamera extends IPiCameraEvents {
   /**
    * Start trying to establish the WebRTC connection.
    */

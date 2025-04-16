@@ -2,8 +2,9 @@ export enum CommandType {
   CONNECT,
   SNAPSHOT,
   METADATA,
-  RECORD,
+  RECORDING,
   CAMERA_CONTROL,
+  BROADCAST,
   UNKNOWN
 };
 

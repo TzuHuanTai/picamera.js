@@ -18,8 +18,10 @@ export class PiCamera implements IPiCamera {
   onConnectionState?: (state: RTCPeerConnectionState) => void;
   onDatachannel?: (dataChannel: RTCDataChannel) => void;
   onSnapshot?: (base64: string) => void;
-  onMetadata?: ((metadata: VideoMetadata) => void);
-  onVideoDownloaded?: ((file: Blob) => void);
+  onStream?: (stream: MediaStream | undefined) => void;
+  onMetadata?: (metadata: VideoMetadata) => void;
+  onProgress?: (received: number, total: number, type: CommandType) => void;
+  onVideoDownloaded?: (file: Uint8Array) => void;
   onTimeout?: () => void;
 
   private options: IPiCameraOptions;
@@ -29,15 +31,10 @@ export class PiCamera implements IPiCamera {
   private dataChannel?: RTCDataChannel;
   private localStream?: MediaStream;
   private remoteStream?: MediaStream;
-  private mediaElement?: HTMLVideoElement;
   private pendingIceCandidates: RTCIceCandidate[] = [];
 
   constructor(options: IPiCameraOptions) {
     this.options = this.initializeOptions(options);
-  }
-
-  attach = (mediaElement: HTMLVideoElement) => {
-    this.mediaElement = mediaElement;
   }
 
   connect = () => {
@@ -77,6 +74,10 @@ export class PiCamera implements IPiCamera {
   terminate = () => {
     clearTimeout(this.rtcTimer);
 
+    this.snapshotReceiver.reset();
+    this.metadataReceiver.reset();
+    this.recordingReceiver.reset();
+
     if (this.dataChannel) {
       if (this.dataChannel.readyState === 'open') {
         const command = new RtcMessage(CommandType.CONNECT, "false");
@@ -94,10 +95,10 @@ export class PiCamera implements IPiCamera {
     if (this.remoteStream) {
       this.remoteStream.getTracks().forEach(track => { track.stop() });
       this.remoteStream = undefined;
-    }
 
-    if (this.mediaElement) {
-      this.mediaElement.srcObject = null;
+      if (this.onStream) {
+        this.onStream(this.remoteStream);
+      }
     }
 
     if (this.rtcPeer) {
@@ -143,7 +144,7 @@ export class PiCamera implements IPiCamera {
 
   fetchRecordedVideo(path: string): void {
     if (this.onVideoDownloaded && this.dataChannel?.readyState === 'open') {
-      const command = new RtcMessage(CommandType.RECORD, path);
+      const command = new RtcMessage(CommandType.RECORDING, path);
       this.dataChannel.send(command.ToString());
     }
   }
@@ -172,10 +173,6 @@ export class PiCamera implements IPiCamera {
   toggleSpeaker = (enabled: boolean = !this.options.isSpeakerOn) => {
     this.options.isSpeakerOn = enabled;
     this.toggleTrack(this.options.isSpeakerOn, this.remoteStream);
-
-    if (this.mediaElement) {
-      this.mediaElement.muted = !this.options.isSpeakerOn;
-    }
   };
 
   private toggleTrack = (isOn: boolean, stream?: MediaStream) => {
@@ -245,11 +242,11 @@ export class PiCamera implements IPiCamera {
           }
         });
 
-        if (this.mediaElement) {
-          this.mediaElement.srcObject = this.options.credits ?
+        if (this.onStream) {
+          this.onStream(this.options.credits ?
             addWatermarkToStream(
               this.remoteStream, 'github.com/TzuHuanTai'
-            ) : this.remoteStream;
+            ) : this.remoteStream);
         }
       });
     }
@@ -284,8 +281,8 @@ export class PiCamera implements IPiCamera {
         case CommandType.METADATA:
           this.metadataReceiver.receiveData(body);
           break;
-        case CommandType.RECORD:
-          this.recordReceiver.receiveData(body);
+        case CommandType.RECORDING:
+          this.recordingReceiver.receiveData(body);
           break;
       }
     });
@@ -314,30 +311,42 @@ export class PiCamera implements IPiCamera {
     return peer;
   }
 
-  private snapshotReceiver = new DataChannelReceiver((body) => {
-    addWatermarkToImage(
-      "data:image/jpeg;base64," + arrayBufferToBase64(body),
-      this.options.credits ? 'github.com/TzuHuanTai' : ''
-    ).then(base64Image => {
-      if (this.onSnapshot) {
-        this.onSnapshot(base64Image);
-      }
-    });
+  private snapshotReceiver = new DataChannelReceiver((received, body) => {
+    if (this.onProgress) {
+      this.onProgress(received, body.length, CommandType.SNAPSHOT);
+    }
+
+    if (received === body.length && this.onSnapshot) {
+      addWatermarkToImage(
+        "data:image/jpeg;base64," + arrayBufferToBase64(body),
+        this.options.credits ? 'github.com/TzuHuanTai' : ''
+      ).then(base64Image => {
+        if (this.onSnapshot) {
+          this.onSnapshot(base64Image);
+        }
+      });
+    }
   });
 
-  private metadataReceiver = new DataChannelReceiver((body) => {
-    let bodyStr = arrayBufferToString(body);
-    let parsedBody = JSON.parse(bodyStr) as VideoMetadata;
+  private metadataReceiver = new DataChannelReceiver((received, body) => {
+    if (this.onProgress) {
+      this.onProgress(received, body.length, CommandType.METADATA);
+    }
 
-    if (this.onMetadata) {
+    if (received === body.length && this.onMetadata) {
+      let bodyStr = arrayBufferToString(body);
+      let parsedBody = JSON.parse(bodyStr) as VideoMetadata;
       this.onMetadata(parsedBody);
     }
   });
 
-  private recordReceiver = new DataChannelReceiver((body) => {
-    if (this.onVideoDownloaded) {
-      const blob = new Blob([body], { type: 'video/mp4' });
-      this.onVideoDownloaded(blob);
+  private recordingReceiver = new DataChannelReceiver((received, body) => {
+    if (this.onProgress) {
+      this.onProgress(received, body.length, CommandType.RECORDING);
+    }
+
+    if (received === body.length && this.onVideoDownloaded) {
+      this.onVideoDownloaded(body);
     }
   });
 
@@ -348,12 +357,14 @@ export class PiCamera implements IPiCamera {
 
   private handleIceMessage = (message: string) => {
     const ice = JSON.parse(message) as RTCIceCandidate;
-    if (this.rtcPeer?.currentRemoteDescription) {
+    if (this.rtcPeer?.remoteDescription) {
       this.rtcPeer.addIceCandidate(new RTCIceCandidate(ice));
 
       while (this.pendingIceCandidates.length > 0) {
         const cacheIce = this.pendingIceCandidates.shift();
-        this.rtcPeer.addIceCandidate(new RTCIceCandidate(cacheIce));
+        if (cacheIce) {
+          this.rtcPeer.addIceCandidate(new RTCIceCandidate(cacheIce));
+        }
       }
     } else {
       this.pendingIceCandidates.push(ice);
