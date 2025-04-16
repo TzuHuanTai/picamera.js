@@ -7,17 +7,27 @@
 
 This package provides the JavaScript client-side implementation for [pi_webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC), a project designed to enable WebRTC-based real-time video and audio streaming on a Raspberry Pi.
 
-# Demo
-
-Try it out: https://tzuhuantai.github.io/picamera.js/demo/
-
-You can find the source code here: [index.html](demo/index.html)
-
 # Installation
 
 ```
 npm install picamera.js
 ```
+
+# Usage
+
+Online demo: https://tzuhuantai.github.io/picamera.js/demo/
+
+You can find the demo source code here: [index.html](demo/index.html)
+
+- Example
+  - [Live video](#live-video)
+  - [Capture a snapshot only](#capture-a-snapshot-only)
+  - [Download the latest video record](#download-the-latest-video-record)
+  - [Set camera properties while streaming](#set-camera-properties-while-streaming)
+- [Notes on local IP or VPN address](#notes-on-local-ip-or-vpn-address)
+- [Notes on Mosquitto](#notes-on-mosquitto)
+- [Notes on self-signed certificates](#notes-on-self-signed-certificates)
+- [API](#api)
 
 # Example
 
@@ -39,9 +49,11 @@ npm install picamera.js
       mqttPort: '8884', // Websocket Port
       mqttUsername: 'hakunamatata',
       mqttPassword: 'Wonderful',
-      stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
+      stunUrls: ["stun:stun1.l.google.com:19302"],
     });
-    conn.attach(videoRef);
+    conn.onStream = (stream) => {
+      videoRef.srcObject = stream ?? null;
+    };
     conn.connect();
   </script>
   ```
@@ -63,6 +75,7 @@ npm install picamera.js
   });
 
   conn.onDatachannel = (dc) => {
+    // on connected to remote datachannel
     conn.snapshot();
   }
 
@@ -74,7 +87,53 @@ npm install picamera.js
   conn.connect();
   ```
 
-- ### Set camera properties while streaming.
+- ### Download the latest video record
+
+  ```javascript
+  let conn = new PiCamera({
+    deviceUid: 'your-custom-uid',
+    mqttHost: 'your.mqtt.cloud',
+    mqttPath: '/mqtt',
+    mqttPort: '8884', // Websocket Port
+    mqttUsername: 'hakunamatata',
+    mqttPassword: 'Wonderful',
+    datachannelOnly: true,
+    stunUrls: ["stun:stun1.l.google.com:19302"],
+  });
+    
+  conn.onDatachannel = () => {
+    // connected to remote datachannel and request the latest file.
+    piCameraRef.current?.getRecordingMetadata();
+  }
+
+  conn.onMetadata = (metadata) => {
+    // retrieved the file's metadata and request download the target.
+    conn.fetchRecordedVideo(metadata.path);
+  }
+
+  conn.onProgress = (recv, total) => {
+    // show up downloading progress of the datachannel.
+  }
+
+  conn.onVideoDownloaded = (file) => {
+    // the file is completely downloaded.
+    const blob = new Blob([file], { type: 'video/mp4' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'video_filename.mp4';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    conn.terminate();
+  }
+
+  conn.connect();
+  ```
+
+- ### Set camera properties while streaming
 
   This example only set auto-focus and auto white balance. Other properties see `CameraPropertyType`.
 
@@ -88,10 +147,12 @@ npm install picamera.js
     mqttPort: '8884', // Websocket Port
     mqttUsername: 'hakunamatata',
     mqttPassword: 'Wonderful',
-    stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
+    stunUrls: ["stun:stun1.l.google.com:19302"],
   });
     
-  conn.attach(videoRef);
+  conn.onStream = (stream) => {
+    videoRef.srcObject = stream ?? null;
+  };
   conn.connect();
 
   // click the button with onclick="setAwb()" when it's connected
@@ -215,15 +276,20 @@ Most browsers require https for video to work. When using self-signed certificat
 * [Events](#events)
   * [onConnectionState](#onConnectionState)
   * [onDatachannel](#onDatachannel)
+  * [onProgress](#onprogress)
+  * [onStream](#onstream)
   * [onSnapshot](#onSnapshot)
+  * [onMetadata](#onmetadata)
+  * [onVideoDownloaded](#onvideodownloaded)
   * [onTimeout](#onTimeout)
 * [Methods](#methods)
-  * [attach](#attach)
   * [connect](#connect)
   * [terminate](#terminate)
   * [getStatus](#getStatus)
+  * [getRecordingMetadata](#getrecordingmetadata)
+  * [fetchRecordedVideo](#fetchrecordedvideo)
+  * [setCameraProperty](#setcameraproperty)
   * [snapshot](#snapshot)
-  * [connect](#connect)
   * [toggleMic](#toggleMic)
   * [toggleSpeaker](#toggleSpeaker)
 
@@ -264,11 +330,35 @@ Available flags for initialization.
 
   Emitted when the data channel successfully opens for data communication.
 
+- ### onProgress
+
+  `= (received: number, total: number, type: CommandType) => {}`
+
+  If any data transfer by datachannel, the on progress will give the received/total info.
+
+- ### onStream
+
+  `= (stream: MediaStream | undefined) => {}`
+
+  Attaches the remote media stream to the specified media element for playback
+
 - ### onSnapshot
 
-  `= (image: string) => {}`
+  `= (base64: string) => {}`
 
-  Triggered after calling the `snapshot()` method. Emits a base64-encoded image once all image packets are received from the server.
+  Emitted after calling the `snapshot()` method. This event emits a base64-encoded image once all image packets are received from the server.
+
+- ### onMetadata
+
+  `= (metadata: VideoMetadata) => {}`
+
+  Emitted when the metadata of a recording file is retrieved.
+
+- ### onVideoDownloaded
+
+  `= (file: Uint8Array) => {}`
+
+  Emitted when a video file is successfully downloaded from the server.
 
 - ### onTimeout
 
@@ -277,13 +367,6 @@ Available flags for initialization.
   Emitted when the P2P connection cannot be established within the allotted time. Automatically calls the `terminate()` function.
 
 ## Methods
-- ### attach
-
-  `.attach(mediaElement: HTMLVideoElement)`
-
-  Attaches the remote media stream to the specified media element for playback.
-
-  - `mediaElement` - The HTML `<video>` element where the remote media stream will be rendered.
 
 - ### connect
 
@@ -302,6 +385,33 @@ Available flags for initialization.
   `.getStatus()` 
   
   Retrieves the current connection status.
+
+- ### getRecordingMetadata
+
+  `.getRecordingMetadata()`
+
+  `.getRecordingMetadata(path: string)`
+
+  `.getRecordingMetadata(time: Date)`
+
+  Retrieves metadata of recording files.
+
+  If called without arguments, returns metadata of the latest recorded file.
+
+  If provided with a file path, returns metadata of up to 8 older recordings before the given file.
+
+  If provided with a date, returns metadata of the closest recorded file to that time.
+
+  - path - The path to an existing recorded file; retrieves metadata of up to 8 older recordings before it.
+  - time - A specific date/time; retrieves metadata of the closest recorded file.
+
+- ### fetchRecordedVideo
+
+  `.fetchRecordedVideo(path: string)` 
+  
+  Requests a video file from the server.
+
+  - `path` - The path to the video file.
 
 - ### setCameraProperty
 
