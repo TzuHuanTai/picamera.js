@@ -33,25 +33,21 @@ export class MqttClient {
     };
 
     this.client = mqtt.connect(connectionOptions);
-    this.attachClientListeners();
-    this.client.reconnect();
-  }
 
-  private attachClientListeners() {
-    if (!this.client) return;
-
-    this.client.on('connect', () => {
+    this.client?.on('connect', () => {
       console.debug(`MQTT connection (${this.clientId}) established. -> ${this.options.deviceUid}`);
       this.onConnect?.(this);
     });
 
-    this.client.on('message', (topic, message) => this.handleMessage(topic, message));
+    this.client?.on('message', (topic, message) => this.handleMessage(topic, message.toString()));
+
+    this.client.reconnect();
   }
 
-  private handleMessage(topic: string, message: Buffer) {
-    console.debug(`Received message on topic: ${topic} -> ${message.toString()}`);
+  private handleMessage(topic: string, message: string) {
+    console.debug(`Received message on topic: ${topic} -> ${message}`);
     const callback = this.subscribedFnMap.get(topic);
-    callback?.(message.toString());
+    callback?.(message);
   }
 
   subscribe = (topic: string, callback: (...args: any[]) => void) => {
