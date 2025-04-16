@@ -34,7 +34,6 @@
     let conn = null;
 
     window.start = function start() {
-      // 取得使用者輸入的連線參數
       const deviceUid = document.getElementById('deviceUid').value;
       const mqttHost = document.getElementById('mqttHost').value;
       const mqttPath = document.getElementById('mqttPath').value;
@@ -42,7 +41,6 @@
       const mqttUsername = document.getElementById('mqttUsername').value;
       const mqttPassword = document.getElementById('mqttPassword').value;
 
-      // 初始化 PiCamera 連線
       conn = new PiCamera({
         deviceUid: deviceUid,
         mqttHost: mqttHost,
@@ -52,7 +50,9 @@
         mqttPassword: mqttPassword,
         stunUrls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
       });
-      conn.attach(videoRef);
+      conn.onStream = (stream) => {
+        videoRef.srcObject = stream;
+      };
       conn.connect();
     };
 
