@@ -2,21 +2,27 @@ import { MqttClient } from '../mqtt/mqtt-client';
 import {
   arrayBufferToBase64,
   arrayBufferToString,
-  generateUid,
   keepOnlyCodec,
   padZero
 } from '../utils/rtc-tools';
-import { CommandType, MetadataCommand } from './command';
-import { DEFAULT_TIMEOUT, MQTT_ICE_TOPIC, MQTT_SDP_TOPIC } from '../constants';
 import { CameraCtlMessage, MetaCmdMessage, RtcMessage, VideoMetadata } from './message';
-import { IPiCamera, IPiCameraOptions } from './pi-camera.interface';
+import {
+  IPiCamera,
+  IPiCameraOptions,
+  ISignalingClient,
+  CommandType,
+  MetadataCommand,
+  DataChannelEnum,
+  PeerConfig
+} from './pi-camera.interface';
 import { CameraPropertyType, CameraPropertyValue } from './camera-property';
-import { addWatermarkToImage, addWatermarkToStream } from '../utils/watermark';
+import { addWatermarkToStream } from '../utils/watermark';
 import { DataChannelReceiver } from './datachannel-receiver';
+import { WebSocketClient } from '../websocket/websocket-client';
 
 export class PiCamera implements IPiCamera {
   onConnectionState?: (state: RTCPeerConnectionState) => void;
-  onDatachannel?: (dataChannel: RTCDataChannel) => void;
+  onDatachannel?: (cmdDataChannel: RTCDataChannel) => void;
   onSnapshot?: (base64: string) => void;
   onStream?: (stream: MediaStream | undefined) => void;
   onMetadata?: (metadata: VideoMetadata) => void;
@@ -25,10 +31,13 @@ export class PiCamera implements IPiCamera {
   onTimeout?: () => void;
 
   private options: IPiCameraOptions;
-  private mqttClient?: MqttClient;
+  private client?: ISignalingClient;
   private rtcTimer?: NodeJS.Timeout;
-  private rtcPeer?: RTCPeerConnection;
-  private dataChannel?: RTCDataChannel;
+
+  private subPeer?: RTCPeerConnection;
+  private pubPeer?: RTCPeerConnection;
+
+  private cmdDataChannel?: RTCDataChannel;
   private localStream?: MediaStream;
   private remoteStream?: MediaStream;
   private pendingIceCandidates: RTCIceCandidate[] = [];
@@ -38,28 +47,21 @@ export class PiCamera implements IPiCamera {
   }
 
   connect = () => {
-    this.mqttClient = new MqttClient(this.options);
-    this.mqttClient.onConnect = async (conn: MqttClient) => {
-      this.rtcPeer = await this.createPeer();
-
-      conn.subscribe(MQTT_SDP_TOPIC, this.handleSdpMessage);
-      conn.subscribe(MQTT_ICE_TOPIC, this.handleIceMessage);
-
-      const offer = await this.rtcPeer.createOffer({});
-
-      if (this.options.codec && offer.sdp) {
-        offer.sdp = keepOnlyCodec(offer.sdp, this.options.codec);
-      }
-
-      this.rtcPeer?.setLocalDescription(offer);
-      conn.publish(MQTT_SDP_TOPIC, JSON.stringify(offer));
+    if (this.options.signaling === 'mqtt') {
+      this.client = new MqttClient(this.options);
+      this.client.onConnect = this.mqttOnConnect;
+    } else if (this.options.signaling === 'websocket') {
+      this.client = new WebSocketClient(this.options);
+      this.client.onConnect = this.wsOnConnect;
+    } else {
+      throw ("unknow signaling method.")
     }
 
-    this.mqttClient.connect();
+    this.client.connect();
 
     this.rtcTimer = setTimeout(() => {
-      if (this.rtcPeer?.connectionState === 'connected' ||
-        this.rtcPeer?.connectionState === 'closed'
+      if (this.subPeer?.connectionState === 'connected' ||
+        this.subPeer?.connectionState === 'closed'
       ) {
         return;
       }
@@ -78,13 +80,13 @@ export class PiCamera implements IPiCamera {
     this.metadataReceiver.reset();
     this.recordingReceiver.reset();
 
-    if (this.dataChannel) {
-      if (this.dataChannel.readyState === 'open') {
+    if (this.cmdDataChannel) {
+      if (this.cmdDataChannel.readyState === 'open') {
         const command = new RtcMessage(CommandType.CONNECT, "false");
-        this.dataChannel.send(command.ToString());
+        this.cmdDataChannel.send(command.ToString());
       }
-      this.dataChannel.close();
-      this.dataChannel = undefined;
+      this.cmdDataChannel.close();
+      this.cmdDataChannel = undefined;
     }
 
     if (this.localStream) {
@@ -101,14 +103,19 @@ export class PiCamera implements IPiCamera {
       }
     }
 
-    if (this.rtcPeer) {
-      this.rtcPeer.close();
-      this.rtcPeer = undefined;
+    if (this.subPeer) {
+      this.subPeer.close();
+      this.subPeer = undefined;
     }
 
-    if (this.mqttClient) {
-      this.mqttClient.disconnect();
-      this.mqttClient = undefined;
+    if (this.pubPeer) {
+      this.pubPeer.close();
+      this.pubPeer = undefined;
+    }
+
+    if (this.client) {
+      this.client.disconnect();
+      this.client = undefined;
     }
 
     if (this.onConnectionState) {
@@ -117,14 +124,14 @@ export class PiCamera implements IPiCamera {
   }
 
   getStatus = (): RTCPeerConnectionState => {
-    if (!this.rtcPeer) {
+    if (!this.subPeer) {
       return 'new';
     }
-    return this.rtcPeer.connectionState;
+    return this.subPeer.connectionState;
   }
 
   getRecordingMetadata(param?: string | Date): void {
-    if (this.onMetadata && this.dataChannel?.readyState === 'open') {
+    if (this.onMetadata && this.cmdDataChannel?.readyState === 'open') {
       let metaCmd: MetaCmdMessage;
 
       if (param === undefined) {
@@ -138,30 +145,30 @@ export class PiCamera implements IPiCamera {
       }
 
       const command = new RtcMessage(CommandType.METADATA, metaCmd.ToString());
-      this.dataChannel.send(command.ToString());
+      this.cmdDataChannel.send(command.ToString());
     }
   }
 
   fetchRecordedVideo(path: string): void {
-    if (this.onVideoDownloaded && this.dataChannel?.readyState === 'open') {
+    if (this.onVideoDownloaded && this.cmdDataChannel?.readyState === 'open') {
       const command = new RtcMessage(CommandType.RECORDING, path);
-      this.dataChannel.send(command.ToString());
+      this.cmdDataChannel.send(command.ToString());
     }
   }
 
   setCameraProperty = (key: CameraPropertyType, value: CameraPropertyValue) => {
-    if (this.dataChannel?.readyState === 'open') {
+    if (this.cmdDataChannel?.readyState === 'open') {
       const ctl = new CameraCtlMessage(key, value);
       const command = new RtcMessage(CommandType.CAMERA_CONTROL, JSON.stringify(ctl));
-      this.dataChannel.send(command.ToString());
+      this.cmdDataChannel.send(command.ToString());
     }
   }
 
   snapshot = (quality: number = 30) => {
-    if (this.onSnapshot && this.dataChannel?.readyState === 'open') {
+    if (this.onSnapshot && this.cmdDataChannel?.readyState === 'open') {
       quality = Math.max(0, Math.min(quality, 100));
       const command = new RtcMessage(CommandType.SNAPSHOT, String(quality));
-      this.dataChannel.send(command.ToString());
+      this.cmdDataChannel.send(command.ToString());
     }
   }
 
@@ -183,9 +190,10 @@ export class PiCamera implements IPiCamera {
 
   private initializeOptions(userOptions: IPiCameraOptions): IPiCameraOptions {
     const defaultOptions = {
+      signaling: 'mqtt',
       mqttProtocol: 'wss',
       mqttPath: '',
-      timeout: DEFAULT_TIMEOUT,
+      timeout: 10000,
       datachannelOnly: false,
       isMicOn: true,
       isSpeakerOn: true,
@@ -213,7 +221,7 @@ export class PiCamera implements IPiCamera {
     return config;
   }
 
-  private createPeer = async (): Promise<RTCPeerConnection> => {
+  private createCmdPeer = async (): Promise<RTCPeerConnection> => {
     const peer = new RTCPeerConnection(this.getRtcConfig());
 
     if (!this.options.datachannelOnly) {
@@ -251,25 +259,19 @@ export class PiCamera implements IPiCamera {
       });
     }
 
-    peer.addEventListener("icecandidate", (e) => {
-      if (e.candidate && this.mqttClient?.isConnected()) {
-        this.mqttClient.publish(MQTT_ICE_TOPIC, JSON.stringify(e.candidate));
-      }
-    });
-
-    this.dataChannel = peer.createDataChannel(generateUid(10), {
+    this.cmdDataChannel = peer.createDataChannel('cmd_channel', {
       negotiated: true,
       ordered: true,
-      id: 0,
+      id: DataChannelEnum.Command,
     });
-    this.dataChannel.binaryType = "arraybuffer";
-    this.dataChannel.addEventListener("open", () => {
-      if (this.onDatachannel && this.dataChannel) {
-        this.onDatachannel(this.dataChannel);
+    this.cmdDataChannel.binaryType = "arraybuffer";
+    this.cmdDataChannel.addEventListener("open", () => {
+      if (this.onDatachannel && this.cmdDataChannel) {
+        this.onDatachannel(this.cmdDataChannel);
       }
     });
 
-    this.dataChannel.addEventListener("message", e => {
+    this.cmdDataChannel.addEventListener("message", e => {
       const packet = new Uint8Array(e.data as ArrayBuffer);
       const header = packet[0];
       const body = packet.slice(1);
@@ -292,23 +294,96 @@ export class PiCamera implements IPiCamera {
         this.onConnectionState(peer.connectionState);
       }
 
-      if (peer.connectionState === "connected" && this.mqttClient?.isConnected()) {
-        this.mqttClient.disconnect();
-        this.mqttClient = undefined;
+      if (peer.connectionState === "connected" && this.client?.isConnected()) {
+        this.client.disconnect();
+        this.client = undefined;
       } else if (peer.connectionState === "failed") {
         this.terminate();
       }
     });
 
-    peer.addEventListener("icegatheringstatechange", e => {
-      console.debug("peer.iceGatheringState: ", peer.iceGatheringState);
+    return peer;
+  }
 
-      if (peer.iceGatheringState === "complete") {
-        console.debug("peer.localDescription: ", peer.localDescription);
-      }
+  private createSfuPeer = async (config: PeerConfig): Promise<RTCPeerConnection> => {
+    const peer = new RTCPeerConnection();
+
+    if (!this.options.datachannelOnly) {
+      this.localStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
+        video: false,
+      });
+
+      this.localStream.getAudioTracks().forEach(track => {
+        peer.addTrack(track, this.localStream!);
+        track.enabled = this.options.isMicOn ?? false;
+      });
+
+      peer.addEventListener("track", (e) => {
+        this.remoteStream = new MediaStream();
+        e.streams[0].getTracks().forEach((track) => {
+          this.remoteStream?.addTrack(track);
+          if (track.kind === "audio") {
+            track.enabled = this.options.isSpeakerOn ?? false;
+          }
+        });
+
+        if (this.onStream) {
+          this.onStream(this.options.credits ?
+            addWatermarkToStream(
+              this.remoteStream, 'github.com/TzuHuanTai'
+            ) : this.remoteStream);
+        }
+      });
+    }
+
+    peer.createDataChannel('_lossy', {
+      ordered: true,
+      maxRetransmits: 0,
+      id: DataChannelEnum.Lossy,
+    });
+    peer.createDataChannel('_reliable', {
+      ordered: true,
+      id: DataChannelEnum.Reliable,
     });
 
     return peer;
+  }
+
+  private mqttOnConnect = async (conn: ISignalingClient) => {
+    this.createCmdPeer().then(async peer => {
+
+      conn.subscribe('sdp', (sdp) => {
+        this.handleSdpMessage(peer, sdp);
+      });
+      conn.subscribe('ice', (ice) => {
+        this.handleIceMessage(peer, ice);
+      });
+
+      const offer = await peer.createOffer({});
+
+      if (this.options.codec && offer.sdp) {
+        offer.sdp = keepOnlyCodec(offer.sdp, this.options.codec);
+      }
+
+      peer.setLocalDescription(offer);
+      peer.onicecandidate = (e) => {
+        if (e.candidate && conn.isConnected()) {
+          conn.publish('ice', JSON.stringify(e.candidate));
+        }
+      }
+      conn.publish('sdp', JSON.stringify(offer));
+
+      this.subPeer = peer;
+    });
+  }
+
+  private wsOnConnect = (conn: ISignalingClient) => {
+
   }
 
   private snapshotReceiver = new DataChannelReceiver((received, body) => {
@@ -317,14 +392,9 @@ export class PiCamera implements IPiCamera {
     }
 
     if (received === body.length && this.onSnapshot) {
-      addWatermarkToImage(
-        "data:image/jpeg;base64," + arrayBufferToBase64(body),
-        this.options.credits ? 'github.com/TzuHuanTai' : ''
-      ).then(base64Image => {
-        if (this.onSnapshot) {
-          this.onSnapshot(base64Image);
-        }
-      });
+      if (this.onSnapshot) {
+        this.onSnapshot("data:image/jpeg;base64," + arrayBufferToBase64(body));
+      }
     }
   });
 
@@ -350,20 +420,20 @@ export class PiCamera implements IPiCamera {
     }
   });
 
-  private handleSdpMessage = (message: string) => {
+  private handleSdpMessage = (pc: RTCPeerConnection, message: string) => {
     const sdp = JSON.parse(message) as RTCSessionDescription;
-    this.rtcPeer?.setRemoteDescription(new RTCSessionDescription(sdp));
+    pc.setRemoteDescription(new RTCSessionDescription(sdp));
   }
 
-  private handleIceMessage = (message: string) => {
+  private handleIceMessage = (pc: RTCPeerConnection, message: string) => {
     const ice = JSON.parse(message) as RTCIceCandidate;
-    if (this.rtcPeer?.remoteDescription) {
-      this.rtcPeer.addIceCandidate(new RTCIceCandidate(ice));
+    if (pc.remoteDescription) {
+      pc.addIceCandidate(new RTCIceCandidate(ice));
 
       while (this.pendingIceCandidates.length > 0) {
         const cacheIce = this.pendingIceCandidates.shift();
         if (cacheIce) {
-          this.rtcPeer.addIceCandidate(new RTCIceCandidate(cacheIce));
+          pc.addIceCandidate(new RTCIceCandidate(cacheIce));
         }
       }
     } else {
