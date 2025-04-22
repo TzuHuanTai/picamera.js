@@ -1,19 +1,19 @@
 import mqtt, { MqttClient as MqttLibClient, IClientOptions } from 'mqtt';
-import { generateUid } from '../utils/rtc-tools';
-import { IMqttConnectionOptions } from './mqtt-client.interface';
+import { IMqttConnectionOptions, TopicType } from './mqtt-client.interface';
+import { ISignalingClient } from '../rtc/pi-camera.interface';
 
-export class MqttClient {
+export class MqttClient implements ISignalingClient {
   private options: IMqttConnectionOptions;
   private clientId: string;
   private client?: MqttLibClient;
-  private subscribedFnMap: Map<string, (...args: any[]) => void>;
+  private subscribedFnMap: Map<string, (msg: string)=> void>;
 
-  public onConnect?: (conn: MqttClient) => void;
+  public onConnect?: (conn: ISignalingClient) => void;
 
   constructor(options: IMqttConnectionOptions) {
     this.options = options;
     this.subscribedFnMap = new Map();
-    this.clientId = generateUid(23);
+    this.clientId = crypto.randomUUID();
   }
 
   connect = () => {
@@ -41,7 +41,7 @@ export class MqttClient {
 
     this.client?.on('message', (topic, message) => this.handleMessage(topic, message.toString()));
 
-    this.client.reconnect();
+    this.client?.connect();
   }
 
   private handleMessage(topic: string, message: string) {
@@ -50,7 +50,7 @@ export class MqttClient {
     callback?.(message);
   }
 
-  subscribe = (topic: string, callback: (...args: any[]) => void) => {
+  subscribe = (topic: TopicType, callback: (msg: string) => void) => {
     if (!this.client) {
       console.warn("Subscribe failed: client is undefined.");
       return;
@@ -61,7 +61,7 @@ export class MqttClient {
     this.subscribedFnMap.set(fullTopic, callback);
   }
 
-  unsubscribe = (topic: string) => {
+  unsubscribe = (topic: TopicType) => {
     if (!this.client) {
       console.warn("Unsubscribe failed: client is undefined.");
       return;
@@ -72,7 +72,7 @@ export class MqttClient {
     this.subscribedFnMap.delete(fullTopic);
   }
 
-  publish = (topic: string, message: string) => {
+  publish = (topic: TopicType, message: string) => {
     if (!this.client) {
       console.warn("Publish failed: client is undefined.");
       return;
@@ -88,6 +88,7 @@ export class MqttClient {
     console.debug(`Terminating MQTT connection (${this.clientId}).`);
     this.client.removeAllListeners();
     this.client.end(true);
+    this.client = undefined;
     this.subscribedFnMap.clear();
   }
 

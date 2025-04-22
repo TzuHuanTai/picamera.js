@@ -1,5 +1,5 @@
 import { CameraPropertyType, CameraPropertyValue } from "./camera-property";
-import { CommandType, MetadataCommand } from "./command";
+import { CommandType, MetadataCommand } from "./pi-camera.interface";
 
 export class RtcMessage {
   type: CommandType;

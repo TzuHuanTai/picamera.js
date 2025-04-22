@@ -3,10 +3,13 @@ import { CodecType } from '../utils/rtc-tools';
 import { CameraPropertyType, CameraPropertyValue } from './camera-property';
 import { IMqttConnectionOptions } from '../mqtt/mqtt-client.interface';
 import { VideoMetadata } from './message';
-import { CommandType } from './command';
+import { IWebSocketConnectionOptions } from '../websocket/websocket-client.interface';
 
-export interface IPiCameraOptions extends IMqttConnectionOptions {
-  stunUrls: string[];
+type SignalingType = 'mqtt' | 'websocket'; 
+
+export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConnectionOptions {
+  signaling?: SignalingType;
+  stunUrls?: string[];
   turnUrl?: string;
   turnUsername?: string;
   turnPassword?: string;
@@ -16,6 +19,47 @@ export interface IPiCameraOptions extends IMqttConnectionOptions {
   isSpeakerOn?: boolean;
   credits?: boolean;
   codec?: CodecType;
+}
+
+export enum CommandType {
+  CONNECT,
+  SNAPSHOT,
+  METADATA,
+  RECORDING,
+  CAMERA_CONTROL,
+  BROADCAST,
+  UNKNOWN
+};
+
+export enum MetadataCommand {
+  LATEST,
+  OLDER,
+  SPECIFIC_TIME
+};
+
+export type OnCommand = (dataChannel: RTCDataChannel, message: string) => void;
+
+export interface PeerConfig extends RTCConfiguration {
+  timeout?: number;
+  isPublisher?: boolean;
+  isSfuPeer?: boolean;
+  hasCandidatesInSdp?: boolean;
+}
+
+export enum DataChannelEnum {
+  Command,
+  Lossy,
+  Reliable
+}
+
+export interface ISignalingClient {
+  onConnect?: (conn: ISignalingClient) => void;
+  connect: () => void;
+  disconnect: () => void;
+  subscribe: (type: any, callback: (msg: string) => void) => void;
+  unsubscribe: (type: any) => void;
+  publish: (type: any, message: string) => void;
+  isConnected: () => boolean;
 }
 
 export interface IPiCameraEvents {

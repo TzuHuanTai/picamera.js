@@ -100,21 +100,6 @@ export function arrayBufferToBase64(buffer: Uint8Array): string {
   return btoa(arrayBufferToString(buffer));
 }
 
-export function generateUid(length: number): string {
-  if (length < 1 || length > 23) {
-    throw new Error('Length must be between 1 and 23 characters.');
-  }
-  const timestamp = Date.now().toString(36);
-  const randomLength = length - timestamp.length;
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = timestamp;
-  for (let i = 0; i < randomLength; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length);
-    result += characters[randomIndex];
-  }
-  return result;
-}
-
 export const padZero = (num: number): string => {
   return num.toString().padStart(2, '0');
 }
