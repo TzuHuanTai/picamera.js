@@ -1,9 +1,9 @@
 
 import { CodecType } from '../utils/rtc-tools';
 import { CameraPropertyType, CameraPropertyValue } from './camera-property';
-import { IMqttConnectionOptions } from '../mqtt/mqtt-client.interface';
+import { IMqttConnectionOptions, MqttTopicType } from '../mqtt/mqtt-client.interface';
 import { VideoMetadata } from './message';
-import { IWebSocketConnectionOptions } from '../websocket/websocket-client.interface';
+import { IWebSocketConnectionOptions, WebsocketActionType } from '../websocket/websocket-client.interface';
 
 type SignalingType = 'mqtt' | 'websocket'; 
 
@@ -39,26 +39,21 @@ export enum MetadataCommand {
 
 export type OnCommand = (dataChannel: RTCDataChannel, message: string) => void;
 
-export interface PeerConfig extends RTCConfiguration {
-  timeout?: number;
-  isPublisher?: boolean;
-  isSfuPeer?: boolean;
-  hasCandidatesInSdp?: boolean;
-}
-
 export enum DataChannelEnum {
   Command,
   Lossy,
   Reliable
 }
 
+export type ActionType = WebsocketActionType | MqttTopicType;
+
 export interface ISignalingClient {
   onConnect?: (conn: ISignalingClient) => void;
   connect: () => void;
   disconnect: () => void;
-  subscribe: (type: any, callback: (msg: string) => void) => void;
-  unsubscribe: (type: any) => void;
-  publish: (type: any, message: string) => void;
+  subscribe: (type: ActionType, callback: (msg: string) => void) => void;
+  unsubscribe: (type: ActionType) => void;
+  publish: (type: ActionType, message: string) => void;
   isConnected: () => boolean;
 }
 

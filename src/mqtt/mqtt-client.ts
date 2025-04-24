@@ -1,6 +1,6 @@
 import mqtt, { MqttClient as MqttLibClient, IClientOptions } from 'mqtt';
-import { IMqttConnectionOptions, TopicType } from './mqtt-client.interface';
-import { ISignalingClient } from '../rtc/pi-camera.interface';
+import { IMqttConnectionOptions, MqttTopicType } from './mqtt-client.interface';
+import { ActionType, ISignalingClient } from '../rtc/pi-camera.interface';
 
 export class MqttClient implements ISignalingClient {
   private options: IMqttConnectionOptions;
@@ -50,7 +50,7 @@ export class MqttClient implements ISignalingClient {
     callback?.(message);
   }
 
-  subscribe = (topic: TopicType, callback: (msg: string) => void) => {
+  subscribe = (topic: ActionType, callback: (msg: string) => void) => {
     if (!this.client) {
       console.warn("Subscribe failed: client is undefined.");
       return;
@@ -61,7 +61,7 @@ export class MqttClient implements ISignalingClient {
     this.subscribedFnMap.set(fullTopic, callback);
   }
 
-  unsubscribe = (topic: TopicType) => {
+  unsubscribe = (topic: ActionType) => {
     if (!this.client) {
       console.warn("Unsubscribe failed: client is undefined.");
       return;
@@ -72,7 +72,7 @@ export class MqttClient implements ISignalingClient {
     this.subscribedFnMap.delete(fullTopic);
   }
 
-  publish = (topic: TopicType, message: string) => {
+  publish = (topic: ActionType, message: string) => {
     if (!this.client) {
       console.warn("Publish failed: client is undefined.");
       return;

@@ -12,13 +12,13 @@ import {
   ISignalingClient,
   CommandType,
   MetadataCommand,
-  DataChannelEnum,
-  PeerConfig
+  DataChannelEnum
 } from './pi-camera.interface';
 import { CameraPropertyType, CameraPropertyValue } from './camera-property';
 import { addWatermarkToStream } from '../utils/watermark';
 import { DataChannelReceiver } from './datachannel-receiver';
 import { WebSocketClient } from '../websocket/websocket-client';
+import { TrickleResponse } from '../websocket/websocket-client.interface';
 
 export class PiCamera implements IPiCamera {
   onConnectionState?: (state: RTCPeerConnectionState) => void;
@@ -31,32 +31,36 @@ export class PiCamera implements IPiCamera {
   onTimeout?: () => void;
 
   private options: IPiCameraOptions;
-  private client?: ISignalingClient;
+  private client: ISignalingClient;
   private rtcTimer?: NodeJS.Timeout;
 
   private subPeer?: RTCPeerConnection;
   private pubPeer?: RTCPeerConnection;
 
   private cmdDataChannel?: RTCDataChannel;
+  trackId: string = "";
   private localStream?: MediaStream;
-  private remoteStream?: MediaStream;
+  private remoteStream: MediaStream = new MediaStream();
   private pendingIceCandidates: RTCIceCandidate[] = [];
+  private pendingPubIceCandidates: RTCIceCandidate[] = [];
+  private pendingSubIceCandidates: RTCIceCandidate[] = [];
 
   constructor(options: IPiCameraOptions) {
     this.options = this.initializeOptions(options);
-  }
 
-  connect = () => {
     if (this.options.signaling === 'mqtt') {
       this.client = new MqttClient(this.options);
       this.client.onConnect = this.mqttOnConnect;
     } else if (this.options.signaling === 'websocket') {
       this.client = new WebSocketClient(this.options);
+      this.InitializeWsSubscriptions(this.client);
       this.client.onConnect = this.wsOnConnect;
     } else {
       throw ("unknow signaling method.")
     }
+  }
 
+  connect = () => {
     this.client.connect();
 
     this.rtcTimer = setTimeout(() => {
@@ -69,6 +73,8 @@ export class PiCamera implements IPiCamera {
       if (this.onTimeout) {
         this.onTimeout();
       }
+
+      console.warn("RTC connection timeout.");
       this.terminate();
     }, this.options.timeout);
   }
@@ -90,13 +96,18 @@ export class PiCamera implements IPiCamera {
     }
 
     if (this.localStream) {
-      this.localStream.getTracks().forEach(track => { track.stop() });
+      this.localStream.getTracks().forEach(track => {
+        track.stop();
+        console.info("stop local track:", track.id);
+      });
       this.localStream = undefined;
     }
 
     if (this.remoteStream) {
-      this.remoteStream.getTracks().forEach(track => { track.stop() });
-      this.remoteStream = undefined;
+      this.remoteStream.getTracks().forEach(track => {
+        track.stop();
+        this.remoteStream.removeTrack(track);
+      });
 
       if (this.onStream) {
         this.onStream(this.remoteStream);
@@ -115,7 +126,6 @@ export class PiCamera implements IPiCamera {
 
     if (this.client) {
       this.client.disconnect();
-      this.client = undefined;
     }
 
     if (this.onConnectionState) {
@@ -241,8 +251,7 @@ export class PiCamera implements IPiCamera {
       peer.addTransceiver("video", { direction: "recvonly" });
       peer.addTransceiver("audio", { direction: "sendrecv" });
 
-      peer.addEventListener("track", (e) => {
-        this.remoteStream = new MediaStream();
+      peer.ontrack = (e) => {
         e.streams[0].getTracks().forEach((track) => {
           this.remoteStream?.addTrack(track);
           if (track.kind === "audio") {
@@ -256,7 +265,7 @@ export class PiCamera implements IPiCamera {
               this.remoteStream, 'github.com/TzuHuanTai'
             ) : this.remoteStream);
         }
-      });
+      };
     }
 
     this.cmdDataChannel = peer.createDataChannel('cmd_channel', {
@@ -265,13 +274,13 @@ export class PiCamera implements IPiCamera {
       id: DataChannelEnum.Command,
     });
     this.cmdDataChannel.binaryType = "arraybuffer";
-    this.cmdDataChannel.addEventListener("open", () => {
+    this.cmdDataChannel.onopen = () => {
       if (this.onDatachannel && this.cmdDataChannel) {
         this.onDatachannel(this.cmdDataChannel);
       }
-    });
+    };
 
-    this.cmdDataChannel.addEventListener("message", e => {
+    this.cmdDataChannel.onmessage = e => {
       const packet = new Uint8Array(e.data as ArrayBuffer);
       const header = packet[0];
       const body = packet.slice(1);
@@ -287,74 +296,91 @@ export class PiCamera implements IPiCamera {
           this.recordingReceiver.receiveData(body);
           break;
       }
-    });
+    };
 
-    peer.addEventListener("connectionstatechange", () => {
+    peer.onconnectionstatechange = () => {
       if (this.onConnectionState) {
         this.onConnectionState(peer.connectionState);
       }
 
       if (peer.connectionState === "connected" && this.client?.isConnected()) {
         this.client.disconnect();
-        this.client = undefined;
       } else if (peer.connectionState === "failed") {
         this.terminate();
       }
-    });
+    };
 
     return peer;
   }
 
-  private createSfuPeer = async (config: PeerConfig): Promise<RTCPeerConnection> => {
-    const peer = new RTCPeerConnection();
+  private createSubPeer = async (config: RTCConfiguration): Promise<RTCPeerConnection> => {
+    const peer = new RTCPeerConnection(config);
 
-    if (!this.options.datachannelOnly) {
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        },
-        video: false,
-      });
-
-      this.localStream.getAudioTracks().forEach(track => {
-        peer.addTrack(track, this.localStream!);
-        track.enabled = this.options.isMicOn ?? false;
-      });
-
-      peer.addEventListener("track", (e) => {
-        this.remoteStream = new MediaStream();
-        e.streams[0].getTracks().forEach((track) => {
-          this.remoteStream?.addTrack(track);
-          if (track.kind === "audio") {
-            track.enabled = this.options.isSpeakerOn ?? false;
-          }
-        });
-
-        if (this.onStream) {
-          this.onStream(this.options.credits ?
-            addWatermarkToStream(
-              this.remoteStream, 'github.com/TzuHuanTai'
-            ) : this.remoteStream);
-        }
-      });
+    peer.onconnectionstatechange = (ev) => {
+      console.debug(`sub peer onconnectionstatechange: ${peer.connectionState}`);
     }
 
+    peer.ontrack = (e) => {
+      e.streams[0].getTracks().forEach((track) => {
+        this.remoteStream?.addTrack(track);
+        if (track.kind === "audio") {
+          track.enabled = this.options.isSpeakerOn ?? false;
+        }
+      });
+
+      console.debug(`on sub track: ${e.track.id}`);
+
+      if (this.onStream) {
+        this.onStream(this.remoteStream);
+      }
+    };
+
+    console.debug(`sub peer is created`);
+
+    return peer;
+  }
+
+  private createPubPeer = async (config: RTCConfiguration): Promise<RTCPeerConnection> => {
+    const peer = new RTCPeerConnection(config);
+
+    // this.localStream = await navigator.mediaDevices.getUserMedia({
+    //   audio: {
+    //     echoCancellation: true,
+    //     noiseSuppression: true,
+    //     autoGainControl: true
+    //   },
+    //   video: false,
+    // });
+
+    // this.localStream.getAudioTracks().forEach(track => {
+    //   this.trackId = track.id;
+    //   console.info("add local audio track:", track.id);
+    //   peer.addTrack(track, this.localStream!);
+    //   track.enabled = this.options.isMicOn ?? false;
+    // });
+
+    peer.onconnectionstatechange = (ev) => {
+      console.debug(`pub peer onconnectionstatechange: ${peer.connectionState}`);
+    }
+
+    console.debug(`pub peer create data channels`);
     peer.createDataChannel('_lossy', {
       ordered: true,
       maxRetransmits: 0,
-      id: DataChannelEnum.Lossy,
     });
     peer.createDataChannel('_reliable', {
       ordered: true,
-      id: DataChannelEnum.Reliable,
     });
+
+    console.debug(`pub peer is created`);
 
     return peer;
   }
 
   private mqttOnConnect = async (conn: ISignalingClient) => {
+    console.debug("Mqtt connected!");
+    clearTimeout(this.rtcTimer);
+
     this.createCmdPeer().then(async peer => {
 
       conn.subscribe('sdp', (sdp) => {
@@ -383,7 +409,100 @@ export class PiCamera implements IPiCamera {
   }
 
   private wsOnConnect = (conn: ISignalingClient) => {
+    console.debug("Websocket connected!");
+    clearTimeout(this.rtcTimer);
+  }
 
+  private InitializeWsSubscriptions(conn: ISignalingClient) {
+    conn.subscribe('join', async (msg) => {
+      console.debug("InitializeWsSubscriptions join message:", msg);
+      let servers: RTCIceServer = JSON.parse(msg);
+      let config: RTCConfiguration = {};
+      config.iceServers = [];
+      config.iceServers.push(servers);
+
+      this.pubPeer = await this.createPubPeer(config);
+      this.pubPeer.onicecandidate = (ev) => {
+        if (ev.candidate?.candidate) {
+          conn.publish('tricklePublisher', ev.candidate?.candidate);
+        }
+      }
+
+      config = {};
+      config.iceServers = [];
+      config.iceServers.push(servers);
+      this.subPeer = await this.createSubPeer(config);
+      this.subPeer.onicecandidate = (ev) => {
+        if (ev.candidate?.candidate) {
+          conn.publish('trickleSubscriber', ev.candidate?.candidate);
+        }
+      }
+
+      let offer = await this.pubPeer!.createOffer();
+      this.pubPeer!.setLocalDescription(offer);
+      if (offer.sdp) {
+        conn.publish('offer', offer.sdp);
+      }
+
+      // conn.publish("addAudioTrack", this.trackId);
+    });
+
+    conn.subscribe('offer', async (sdp) => {
+      this.subPeer!.setRemoteDescription({ type: "offer", sdp: sdp } as RTCSessionDescriptionInit);
+      let answer = await this.subPeer?.createAnswer();
+      this.subPeer!.setLocalDescription(answer);
+      if (answer?.sdp) {
+        conn.publish('answer', answer.sdp);
+      }
+    });
+
+    conn.subscribe('answer', async (sdp) => {
+      this.pubPeer!.setRemoteDescription({ type: "answer", sdp: sdp } as RTCSessionDescriptionInit);
+      console.debug("pubPeer set remote description:", this.pubPeer?.signalingState);
+    });
+
+    conn.subscribe('trackPublished', async () => {
+      // let offer = await this.pubPeer?.createOffer();
+      // this.pubPeer?.setLocalDescription(offer);
+      // if (offer?.sdp) {
+      //   conn.publish('offer', offer.sdp);
+      // }
+    });
+
+    conn.subscribe('trickle', async (msg) => {
+      let trickle = TrickleResponse.fromJson(msg);
+      if (trickle.target === 'PUBLISHER') {
+        if (this.pubPeer?.remoteDescription) {
+          this.pubPeer.addIceCandidate(trickle.candidateInit);
+
+          while (this.pendingPubIceCandidates.length > 0) {
+            const cacheIce = this.pendingPubIceCandidates.shift();
+            if (cacheIce) {
+              this.pubPeer.addIceCandidate(cacheIce);
+            }
+          }
+        } else {
+          this.pendingPubIceCandidates.push(new RTCIceCandidate(trickle.candidateInit));
+        }
+      } else if (trickle.target === 'SUBSCRIBER') {
+        if (this.subPeer?.remoteDescription) {
+          this.subPeer.addIceCandidate(trickle.candidateInit);
+
+          while (this.pendingSubIceCandidates.length > 0) {
+            const cacheIce = this.pendingSubIceCandidates.shift();
+            if (cacheIce) {
+              this.subPeer.addIceCandidate(cacheIce);
+            }
+          }
+        } else {
+          this.pendingSubIceCandidates.push(new RTCIceCandidate(trickle.candidateInit));
+        }
+      }
+    });
+
+    conn.subscribe('leave', async () => {
+      conn.disconnect();
+    });
   }
 
   private snapshotReceiver = new DataChannelReceiver((received, body) => {
