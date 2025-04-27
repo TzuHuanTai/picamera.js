@@ -332,7 +332,7 @@ Available flags for initialization.
 
 - ### onProgress
 
-  `= (received: number, total: number, type: CommandType) => {}`
+  `= (received: number, total: number, type: CmdType) => {}`
 
   If any data transfer by datachannel, the on progress will give the received/total info.
 

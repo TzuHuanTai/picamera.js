@@ -1,0 +1,147 @@
+import { ISignalingClient } from './signaling-client';
+
+export interface IWebSocketConnectionOptions {
+  websocketUrl?: string;
+  token?: string;
+}
+
+export type WebsocketActionType = 'join' | 'offer' | 'answer' |
+  'trickle' | 'addVideoTrack' | 'addAudioTrack' |
+  'trackPublished' | 'leave' | 'close' | 'ping' |
+  'tricklePublisher' | 'trickleSubscriber' |
+  'participant' | 'error' | 'info';
+
+type TrickleTarget = 'PUBLISHER' | 'SUBSCRIBER';
+
+interface ProxyMessage {
+  action: WebsocketActionType;
+  message: string;
+}
+
+class TrickleResponse {
+  target: TrickleTarget;
+  candidateInit: RTCIceCandidateInit;
+
+  constructor(data: { target: TrickleTarget, candidateInit: RTCIceCandidateInit }) {
+    this.target = data.target;
+    this.candidateInit = data.candidateInit;
+  }
+
+  static fromJson(jsonStr: string): TrickleResponse {
+    const parsed = JSON.parse(jsonStr);
+    if (typeof parsed.candidateInit === "string") {
+      parsed.candidateInit = JSON.parse(parsed.candidateInit);
+    }
+    return new TrickleResponse(parsed);
+  }
+}
+
+export class WebSocketClient implements ISignalingClient<WebSocketClient, WebsocketActionType> {
+  private url?: string;
+  private token?: string;
+  private client?: WebSocket;
+  private pingInterval?: NodeJS.Timeout;
+
+  public onConnect?: (conn: WebSocketClient) => void;
+  public onJoin?: (server: RTCIceServer) => void;
+  public onOffer?: (offer: RTCSessionDescriptionInit) => void;
+  public onAnswer?: (answer: RTCSessionDescriptionInit) => void;
+  public onPublisherIce?: (ice: RTCIceCandidateInit) => void;
+  public onSubscriberIce?: (ice: RTCIceCandidateInit) => void;
+  public onParticipant?: (participant: string) => void;
+  public onInfo?: (info: string) => void;
+  public onTrackPublished?: () => void;
+  public onLeave?: () => void;
+
+  constructor(options: IWebSocketConnectionOptions) {
+    this.url = options.websocketUrl;
+    this.token = options.token;
+  }
+
+  connect = () => {
+    this.client = new WebSocket(`${this.url}/rtc?token=${this.token}`);
+
+    this.client.onopen = () => {
+      console.log('WebSocket Connected');
+      this.onConnect?.(this);
+    };
+
+    this.client.onmessage = (event) => {
+      this.handleMessage(event);
+    };
+
+    this.client.onclose = () => {
+      console.log('WebSocket Disconnected');
+      this.clearPingInterval();
+    };
+
+    this.client.onerror = (err) => {
+      console.error('WebSocket Error:', err);
+    };
+  }
+
+  private handleMessage(event: MessageEvent) {
+    let { action, message }: ProxyMessage = JSON.parse(event.data);
+    console.debug(`Received sfu message (${action}): ${message}`);
+
+    if (action === 'join') {
+      this.startPingInterval();
+      this.onJoin?.(JSON.parse(message));
+    } else if (action === 'offer') {
+      const sdp: RTCSessionDescriptionInit = { type: "offer", sdp: message };
+      this.onOffer?.(sdp);
+    } else if (action === 'answer') {
+      const sdp: RTCSessionDescriptionInit = { type: "answer", sdp: message };
+      this.onAnswer?.(sdp);
+    } else if (action === 'trickle') {
+      const trickleResponse = TrickleResponse.fromJson(message);
+      if (trickleResponse.target === 'PUBLISHER') {
+        this.onPublisherIce?.(trickleResponse.candidateInit);
+      } else if (trickleResponse.target === 'SUBSCRIBER') {
+        this.onSubscriberIce?.(trickleResponse.candidateInit);
+      }
+    } else if (action === 'trackPublished') {
+      this.onTrackPublished?.();
+    } else if (action === 'participant') {
+      this.onParticipant?.(message);
+    } else if (action === 'leave') {
+      this.clearPingInterval();
+      this.onLeave?.();
+    }
+  }
+
+  send = (action: WebsocketActionType, message: string = '') => {
+    if (!this.isConnected()) {
+      console.warn("Publish failed: client is not connected.");
+      return;
+    }
+
+    let data: ProxyMessage = { action: action, message };
+    this.client?.send(JSON.stringify(data));
+  }
+
+  disconnect = () => {
+    if (!this.client) return;
+    this.send('leave');
+    console.debug(`Terminating websocket connection.`);
+    this.client.close();
+  }
+
+  isConnected = (): boolean => this.client?.readyState === WebSocket.OPEN;
+
+  private startPingInterval() {
+    this.clearPingInterval();
+
+    console.debug('start ping interval');
+    this.pingInterval = setInterval(() => {
+      this.send('ping');
+    }, 5000);
+  }
+
+  private clearPingInterval() {
+    console.debug('clearing ping interval');
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+    }
+  }
+}
