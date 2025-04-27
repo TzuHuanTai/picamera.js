@@ -1,9 +1,9 @@
 
 import { CodecType } from '../utils/rtc-tools';
-import { CameraPropertyType, CameraPropertyValue } from './camera-property';
-import { IMqttConnectionOptions, MqttTopicType } from '../mqtt/mqtt-client.interface';
-import { VideoMetadata } from './message';
-import { IWebSocketConnectionOptions, WebsocketActionType } from '../websocket/websocket-client.interface';
+import { CameraPropertyType, CameraPropertyValue } from '../constants/camera-property';
+import { CmdType, VideoMetadata } from '../rtc/cmd-message';
+import { IMqttConnectionOptions, MqttTopicType } from './mqtt-client';
+import { IWebSocketConnectionOptions, WebsocketActionType } from './websocket-client';
 
 type SignalingType = 'mqtt' | 'websocket'; 
 
@@ -21,39 +21,16 @@ export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConn
   codec?: CodecType;
 }
 
-export enum CommandType {
-  CONNECT,
-  SNAPSHOT,
-  METADATA,
-  RECORDING,
-  CAMERA_CONTROL,
-  BROADCAST,
-  UNKNOWN
-};
-
-export enum MetadataCommand {
-  LATEST,
-  OLDER,
-  SPECIFIC_TIME
-};
-
-export type OnCommand = (dataChannel: RTCDataChannel, message: string) => void;
-
-export enum DataChannelEnum {
-  Command,
-  Lossy,
-  Reliable
-}
-
 export type ActionType = WebsocketActionType | MqttTopicType;
 
-export interface ISignalingClient {
-  onConnect?: (conn: ISignalingClient) => void;
+export interface ISignalingClient<
+  TClient,
+  TAction = ActionType
+> {
+  onConnect?: (conn: TClient) => void;
   connect: () => void;
   disconnect: () => void;
-  subscribe: (type: ActionType, callback: (msg: string) => void) => void;
-  unsubscribe: (type: ActionType) => void;
-  publish: (type: ActionType, message: string) => void;
+  send: (type: TAction, message: string) => void;
   isConnected: () => boolean;
 }
 
@@ -77,14 +54,14 @@ export interface IPiCameraEvents {
    * @param received 
    * @param total 
    */
-  onProgress?: (received: number, total: number, type: CommandType) => void;
+  onProgress?: (received: number, total: number, type: CmdType) => void;
 
   /**
    * Attaches the remote media stream to the specified media element for playback.
    *
    * @param stream - The HTML video element where the remote media stream will be rendered.
    */
-  onStream?: (stream: MediaStream | undefined) => void;
+  onStream?: (stream: MediaStream) => void;
 
   /**
    * Emitted after calling the `snapshot()` method. This event emits a base64-encoded image 

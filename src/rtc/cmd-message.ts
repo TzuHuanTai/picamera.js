@@ -1,11 +1,26 @@
-import { CameraPropertyType, CameraPropertyValue } from "./camera-property";
-import { CommandType, MetadataCommand } from "./pi-camera.interface";
+import { CameraPropertyType, CameraPropertyValue } from "../constants/camera-property";
 
-export class RtcMessage {
-  type: CommandType;
+export enum CmdType {
+  CONNECT,
+  SNAPSHOT,
+  METADATA,
+  RECORDING,
+  CAMERA_CONTROL,
+  BROADCAST,
+  UNKNOWN
+};
+
+export enum MetadataCmd {
+  LATEST,
+  OLDER,
+  SPECIFIC_TIME
+};
+
+export class CmdMessage {
+  type: CmdType;
   message?: string;
 
-  constructor(type: CommandType, message: string | number) {
+  constructor(type: CmdType, message: string | number) {
     this.type = type;
     this.message = typeof message === 'string' ? message : String(message);
   }
@@ -16,10 +31,10 @@ export class RtcMessage {
 }
 
 export class MetaCmdMessage {
-  command: MetadataCommand;
+  command: MetadataCmd;
   message: string;
 
-  constructor(command: MetadataCommand, message: string = "") {
+  constructor(command: MetadataCmd, message: string = "") {
     this.command = command;
     this.message = message;
   }
@@ -35,7 +50,7 @@ export type VideoMetadata = {
   path: string;
 }
 
-export class CameraCtlMessage {
+export class CameraCtrlMessage {
   key: CameraPropertyType;
   value: CameraPropertyValue;
 
