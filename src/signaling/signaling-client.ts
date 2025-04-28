@@ -3,9 +3,9 @@ import { CodecType } from '../utils/rtc-tools';
 import { CameraPropertyType, CameraPropertyValue } from '../constants/camera-property';
 import { CmdType, VideoMetadata } from '../rtc/cmd-message';
 import { IMqttConnectionOptions, MqttTopicType } from './mqtt-client';
-import { IWebSocketConnectionOptions, WebsocketActionType } from './websocket-client';
+import { IWebSocketConnectionOptions, Participant, Quality, RoomInfo, Speaking, WebsocketActionType } from './websocket-client';
 
-type SignalingType = 'mqtt' | 'websocket'; 
+type SignalingType = 'mqtt' | 'websocket';
 
 export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConnectionOptions {
   signaling?: SignalingType;
@@ -90,6 +90,36 @@ export interface IPiCameraEvents {
    * Automatically triggers the `terminate()` function.
    */
   onTimeout?: () => void;
+
+  /**
+   * Emitted when the SFU room information changes.
+   * 
+   * @param room - The room information, including the room ID and name.
+   * @returns 
+   */
+  onRoomInfo?: (room: RoomInfo) => void;
+
+  /**
+   * Emitted when the quality of SFU connections change.
+   *
+   * @param quality - The new quality settings for the video stream.
+   */
+  onQuility?: (quality: Quality[]) => void;
+
+  /**
+   * Emitted when an SFU participant starts or stops speaking.
+   *
+   * @param speaking - The list of participants who are currently speaking.
+   */
+  onSpeaking?: (speaking: Speaking[]) => void;
+
+  /**
+   * Emitted when the list of participants in the SFU room changes.
+   *
+   * @param participant - Update the participants' state currently in the room.
+   */
+  onParticipant?: (participant: Participant[]) => void;
+
 }
 
 export interface IPiCamera extends IPiCameraEvents {

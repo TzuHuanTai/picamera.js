@@ -24,6 +24,7 @@ You can find the demo source code here: [index.html](demo/index.html)
   - [Capture a snapshot only](#capture-a-snapshot-only)
   - [Download the latest video record](#download-the-latest-video-record)
   - [Set camera properties while streaming](#set-camera-properties-while-streaming)
+  - [Watch video via the SFU server](#watch-video-via-the-sfu-server)
 - [Notes on local IP or VPN address](#notes-on-local-ip-or-vpn-address)
 - [Notes on Mosquitto](#notes-on-mosquitto)
 - [Notes on self-signed certificates](#notes-on-self-signed-certificates)
@@ -166,6 +167,24 @@ You can find the demo source code here: [index.html](demo/index.html)
   }
   ```
 
+- ### Watch video via the SFU server
+
+  ```javascript
+  let videoRef = document.getElementById('videoElement');
+
+  let conn = new PiCamera({
+    signaling: 'websocket',
+    websocketUrl: 'ws://api.picamera.live',
+    token: 'your-token',
+  });
+
+  conn.onSidStream = (sid, stream) => {
+    videoRef.srcObject = stream;
+  };
+
+  conn.connect();
+  ```
+
 # Notes on local IP or VPN address
 When running PiCamera.js over a local network or a VPN, set `stunUrls` to `null` or leave it out of the configuration altogether.
 
@@ -278,10 +297,15 @@ Most browsers require https for video to work. When using self-signed certificat
   * [onDatachannel](#onDatachannel)
   * [onProgress](#onprogress)
   * [onStream](#onstream)
+  * [onSidStream](#onsidstream)
   * [onSnapshot](#onSnapshot)
   * [onMetadata](#onmetadata)
   * [onVideoDownloaded](#onvideodownloaded)
   * [onTimeout](#onTimeout)
+  * [onRoomInfo](#onroominfo)
+  * [onQuility](#onquility)
+  * [onSpeaking](#onspeaking)
+  * [onParticipant](#onparticipant)
 * [Methods](#methods)
   * [connect](#connect)
   * [terminate](#terminate)
@@ -299,6 +323,7 @@ Available flags for initialization.
 
 | Option          | Type       | Default | Description                                                  |
 | --------------- | ---------- | ------- | ------------------------------------------------------------ |
+| signaling       | `'mqtt' \| 'websocket'`   | `mqtt` | The signaling method.    |
 | deviceUid       | `string`   |         | The custom `--uid` provided in the running `pi_webrtc`.      |
 | mqttHost        | `string`   |         | The MQTT server host.                                        |
 | mqttPath        | `string`   | `/mqtt` | The MQTT server path.                                        |
@@ -306,6 +331,8 @@ Available flags for initialization.
 | mqttProtocol    | `string`   | `wss`   | The portocol for the MQTT server.                            |
 | mqttUsername    | `string`   |         | The username for the MQTT server.                            |
 | mqttPassword    | `string`   |         | The password for the MQTT server.                            |
+| websocketUrl    | `string`   |         | The websocket url connect to the SFU server.
+| token           | `string`   |         | The token for the SFU server.
 | stunUrls        | `string[]` |         | An array of STUN server URLs for WebRTC. Leave out or set to null for local network or VPN IP addresses. |
 | turnUrl         | `string`   |         | The TURN server URL for WebRTC.                              |
 | turnUsername    | `string`   |         | The username for the TURN server.                            |
@@ -338,9 +365,15 @@ Available flags for initialization.
 
 - ### onStream
 
-  `= (stream: MediaStream | undefined) => {}`
+  `= (stream: MediaStream) => {}`
 
-  Attaches the remote media stream to the specified media element for playback
+  Triggered when a media stream is received from either SFU or MQTT.
+
+- ### onSidStream
+
+  `= (sid: string, stream: MediaStream) => {}`
+
+  Triggered only when a media stream is received from the SFU, delivering both the participant's server-side ID (sid) and the associated MediaStream. 
 
 - ### onSnapshot
 
@@ -365,6 +398,30 @@ Available flags for initialization.
   `= () => {}`
 
   Emitted when the P2P connection cannot be established within the allotted time. Automatically calls the `terminate()` function.
+
+- ### onRoomInfo
+
+  `= (participant: RoomInfo) => {}`
+
+  Emitted when the SFU room information changes.
+
+- ### onQuility
+
+  `= (quality: Quality[]) => {}`
+
+  Emitted when the quality of SFU connections change.
+
+- ### onSpeaking
+
+  `= (speaking: Speaking[]) => {}`
+
+  Emitted when an SFU participant starts or stops speaking.
+
+- ### onParticipant
+
+  `= (participant: Participant[]) => {}`
+
+  Emitted when the list of participants in the SFU room changes.
 
 ## Methods
 

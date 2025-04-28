@@ -2,7 +2,7 @@ import { MqttClient } from './signaling/mqtt-client';
 import { keepOnlyCodec } from './utils/rtc-tools';
 import { IPiCamera, IPiCameraOptions, ISignalingClient } from './signaling/signaling-client';
 import { CameraPropertyType, CameraPropertyValue } from './constants/camera-property';
-import { WebSocketClient } from './signaling/websocket-client';
+import { Participant, Quality, RoomInfo, Speaking, WebSocketClient } from './signaling/websocket-client';
 import { CmdType, VideoMetadata } from './rtc/cmd-message';
 import { RtcPeerConfig } from './peer/rtc-peer';
 import { CommanderPeer } from './peer/commander-peer';
@@ -15,10 +15,16 @@ export class PiCamera implements IPiCamera {
   onDatachannel?: (cmdDataChannel: RTCDataChannel) => void;
   onSnapshot?: (base64: string) => void;
   onStream?: (stream: MediaStream) => void;
+  onSidStream?: (sid: string, stream: MediaStream) => void;
   onMetadata?: (metadata: VideoMetadata) => void;
   onProgress?: (received: number, total: number, type: CmdType) => void;
   onVideoDownloaded?: (file: Uint8Array) => void;
   onTimeout?: () => void;
+
+  onRoomInfo?: (room: RoomInfo) => void;
+  onQuility?: (quality: Quality[]) => void;
+  onSpeaking?: (speaking: Speaking[]) => void;
+  onParticipant?: (participant: Participant[]) => void;
 
   private options: IPiCameraOptions;
   private client: ISignalingClient<any, any>;
@@ -152,6 +158,7 @@ export class PiCamera implements IPiCamera {
     });
 
     this.cmdPeer.onStream = (stream) => this.onStream?.(stream);
+    this.cmdPeer.onSidStream = (sid, stream) => this.onSidStream?.(sid, stream);
     this.cmdPeer.onIceCandidate = (ice) => conn.send('ice', JSON.stringify(ice.candidate));
     this.cmdPeer.onConnectionStateChange = (state) => {
       this.onConnectionState?.(state);
@@ -204,6 +211,7 @@ export class PiCamera implements IPiCamera {
 
       this.subPeer = new SubscriberPeer(config);
       this.subPeer.onStream = (stream) => this.onStream?.(stream);
+      this.subPeer.onSidStream = (sid, stream) => this.onSidStream?.(sid, stream);
       this.subPeer.onIceCandidate = (ev) => {
         if (ev.candidate?.candidate) {
           conn.send('trickleSubscriber', ev.candidate?.candidate);
@@ -235,9 +243,10 @@ export class PiCamera implements IPiCamera {
       // }
     };
 
-    conn.onParticipant = async (msg) => {
-      // let participant = JSON.parse(msg);
-    };
+    conn.onParticipant = (msg) => this.onParticipant?.(msg);
+    conn.onRoomInfo = (msg) => this.onRoomInfo?.(msg);
+    conn.onQuility = (msg) => this.onQuility?.(msg);
+    conn.onSpeaking = (msg) => this.onSpeaking?.(msg);
 
     conn.onLeave = async () => conn.disconnect();
   }
