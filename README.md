@@ -174,7 +174,7 @@ You can find the demo source code here: [index.html](demo/index.html)
 
   let conn = new PiCamera({
     signaling: 'websocket',
-    websocketUrl: 'ws://api.picamera.live',
+    websocketUrl: 'wss://api.picamera.live',
     token: 'your-token',
   });
 
