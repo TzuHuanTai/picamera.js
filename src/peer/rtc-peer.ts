@@ -8,6 +8,7 @@ export interface RtcPeerConfig extends RTCConfiguration {
 
 export class RtcPeer {
   onStream?: (stream: MediaStream) => void;
+  onSidStream?: (sid: string, stream: MediaStream) => void;
   onIceCandidate?: ((ev: RTCPeerConnectionIceEvent) => any);
   onConnectionStateChange?: ((ev: RTCPeerConnectionState) => any);
 
@@ -138,8 +139,8 @@ export class RtcPeer {
       console.debug(`get ${track.kind} tracks => label: ${track.label}, id: ${track.id}`);
     });
 
-    console.debug(`on stream: `, event.streams[0]);
-
+    const [sid] = event.streams[0].id.split('|');
     this.onStream?.(this.remoteStream);
+    this.onSidStream?.(sid, this.remoteStream);
   }
 }

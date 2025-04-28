@@ -9,6 +9,7 @@ export type WebsocketActionType = 'join' | 'offer' | 'answer' |
   'trickle' | 'addVideoTrack' | 'addAudioTrack' |
   'trackPublished' | 'leave' | 'close' | 'ping' |
   'tricklePublisher' | 'trickleSubscriber' |
+  'roomInfo' | 'quality' | 'speaking' |
   'participant' | 'error' | 'info';
 
 type TrickleTarget = 'PUBLISHER' | 'SUBSCRIBER';
@@ -16,6 +17,27 @@ type TrickleTarget = 'PUBLISHER' | 'SUBSCRIBER';
 interface ProxyMessage {
   action: WebsocketActionType;
   message: string;
+}
+
+export interface Participant {
+  sid: string;
+  id: string;
+  state: 'JOINING' | 'JOINED' | 'ACTIVE' | 'DISCONNECTED';
+}
+
+export interface RoomInfo {
+  sid: string;
+  name: string;
+}
+
+export interface Quality {
+  sid: string,
+  score: number,
+}
+
+export interface Speaking {
+  sid: string,
+  level: number,
 }
 
 class TrickleResponse {
@@ -42,16 +64,18 @@ export class WebSocketClient implements ISignalingClient<WebSocketClient, Websoc
   private client?: WebSocket;
   private pingInterval?: NodeJS.Timeout;
 
-  public onConnect?: (conn: WebSocketClient) => void;
-  public onJoin?: (server: RTCIceServer) => void;
-  public onOffer?: (offer: RTCSessionDescriptionInit) => void;
-  public onAnswer?: (answer: RTCSessionDescriptionInit) => void;
-  public onPublisherIce?: (ice: RTCIceCandidateInit) => void;
-  public onSubscriberIce?: (ice: RTCIceCandidateInit) => void;
-  public onParticipant?: (participant: string) => void;
-  public onInfo?: (info: string) => void;
-  public onTrackPublished?: () => void;
-  public onLeave?: () => void;
+  onConnect?: (conn: WebSocketClient) => void;
+  onJoin?: (server: RTCIceServer) => void;
+  onOffer?: (offer: RTCSessionDescriptionInit) => void;
+  onAnswer?: (answer: RTCSessionDescriptionInit) => void;
+  onPublisherIce?: (ice: RTCIceCandidateInit) => void;
+  onSubscriberIce?: (ice: RTCIceCandidateInit) => void;
+  onRoomInfo?: (participant: RoomInfo) => void;
+  onQuility?: (participant: Quality[]) => void;
+  onSpeaking?: (participant: Speaking[]) => void;
+  onParticipant?: (participant: Participant[]) => void;
+  onTrackPublished?: () => void;
+  onLeave?: () => void;
 
   constructor(options: IWebSocketConnectionOptions) {
     this.url = options.websocketUrl;
@@ -82,7 +106,6 @@ export class WebSocketClient implements ISignalingClient<WebSocketClient, Websoc
 
   private handleMessage(event: MessageEvent) {
     let { action, message }: ProxyMessage = JSON.parse(event.data);
-    console.debug(`Received sfu message (${action}): ${message}`);
 
     if (action === 'join') {
       this.startPingInterval();
@@ -102,8 +125,14 @@ export class WebSocketClient implements ISignalingClient<WebSocketClient, Websoc
       }
     } else if (action === 'trackPublished') {
       this.onTrackPublished?.();
+    } else if (action === 'roomInfo') {
+      this.onRoomInfo?.(JSON.parse(message));
+    } else if (action === 'quality') {
+      this.onQuility?.(JSON.parse(message));
+    } else if (action === 'speaking') {
+      this.onSpeaking?.(JSON.parse(message));
     } else if (action === 'participant') {
-      this.onParticipant?.(message);
+      this.onParticipant?.(JSON.parse(message));
     } else if (action === 'leave') {
       this.clearPingInterval();
       this.onLeave?.();
