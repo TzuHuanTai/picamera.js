@@ -2,7 +2,9 @@ import { ISignalingClient } from './signaling-client';
 
 export interface IWebSocketConnectionOptions {
   websocketUrl?: string;
-  token?: string;
+  apiKey?: string;
+  userId?: string;
+  roomId?: string;
 }
 
 export type WebsocketActionType = 'join' | 'offer' | 'answer' |
@@ -60,7 +62,9 @@ class TrickleResponse {
 
 export class WebSocketClient implements ISignalingClient<WebSocketClient, WebsocketActionType> {
   private url?: string;
-  private token?: string;
+  private apiKey: string;
+  private userId: string;
+  private roomId: string;
   private client?: WebSocket;
   private pingInterval?: NodeJS.Timeout;
 
@@ -79,11 +83,19 @@ export class WebSocketClient implements ISignalingClient<WebSocketClient, Websoc
 
   constructor(options: IWebSocketConnectionOptions) {
     this.url = options.websocketUrl;
-    this.token = options.token;
+    this.apiKey = options.apiKey ?? '';
+    this.userId = options.userId ?? crypto.randomUUID();
+    this.roomId = options.roomId ?? '';
   }
 
   connect = () => {
-    this.client = new WebSocket(`${this.url}/rtc?token=${this.token}`);
+    const params = new URLSearchParams({
+      apiKey: this.apiKey,
+      userId: this.userId,
+      roomId: this.roomId,
+    });
+
+    this.client = new WebSocket(`${this.url}/rtc?${params.toString()}`);
 
     this.client.onopen = () => {
       console.log('WebSocket Connected');

@@ -167,7 +167,7 @@ You can find the demo source code here: [index.html](demo/index.html)
   }
   ```
 
-- ### Watch video via the SFU server
+- ### Watch videos via the SFU server
 
   ```javascript
   let videoRef = document.getElementById('videoElement');
@@ -175,10 +175,10 @@ You can find the demo source code here: [index.html](demo/index.html)
   let conn = new PiCamera({
     signaling: 'websocket',
     websocketUrl: 'wss://api.picamera.live',
-    token: 'your-token',
+    apiKey: 'your-api-key',
   });
 
-  conn.onSidStream = (sid, stream) => {
+  conn.onSfuStream = (sid, stream) => {
     videoRef.srcObject = stream;
   };
 
@@ -297,7 +297,7 @@ Most browsers require https for video to work. When using self-signed certificat
   * [onDatachannel](#onDatachannel)
   * [onProgress](#onprogress)
   * [onStream](#onstream)
-  * [onSidStream](#onsidstream)
+  * [onSfuStream](#onsfustream)
   * [onSnapshot](#onSnapshot)
   * [onMetadata](#onmetadata)
   * [onVideoDownloaded](#onvideodownloaded)
@@ -323,7 +323,7 @@ Available flags for initialization.
 
 | Option          | Type       | Default | Description                                                  |
 | --------------- | ---------- | ------- | ------------------------------------------------------------ |
-| signaling       | `'mqtt' \| 'websocket'`   | `mqtt` | The signaling method.    |
+| signaling       | `'mqtt' \| 'websocket'` | `mqtt` | The signaling method.                            |
 | deviceUid       | `string`   |         | The custom `--uid` provided in the running `pi_webrtc`.      |
 | mqttHost        | `string`   |         | The MQTT server host.                                        |
 | mqttPath        | `string`   | `/mqtt` | The MQTT server path.                                        |
@@ -331,8 +331,10 @@ Available flags for initialization.
 | mqttProtocol    | `string`   | `wss`   | The portocol for the MQTT server.                            |
 | mqttUsername    | `string`   |         | The username for the MQTT server.                            |
 | mqttPassword    | `string`   |         | The password for the MQTT server.                            |
-| websocketUrl    | `string`   |         | The websocket url connect to the SFU server.
-| token           | `string`   |         | The token for the SFU server.
+| websocketUrl    | `string`   |         | The WebSocket URL used to connect to the SFU server.         |
+| apiKey          | `string`   |         | The API key used to authenticate with the SFU server.        |
+| userId          | `string`   | `(random uuid)` | The user identifier displayed in the room after joining the SFU server. |
+| roomId          | `string`   |         | The room ID used to join a session on the SFU server.        |
 | stunUrls        | `string[]` |         | An array of STUN server URLs for WebRTC. Leave out or set to null for local network or VPN IP addresses. |
 | turnUrl         | `string`   |         | The TURN server URL for WebRTC.                              |
 | turnUsername    | `string`   |         | The username for the TURN server.                            |
@@ -369,7 +371,7 @@ Available flags for initialization.
 
   Triggered when a media stream is received from either SFU or MQTT.
 
-- ### onSidStream
+- ### onSfuStream
 
   `= (sid: string, stream: MediaStream) => {}`
 

@@ -15,7 +15,7 @@ export class PiCamera implements IPiCamera {
   onDatachannel?: (cmdDataChannel: RTCDataChannel) => void;
   onSnapshot?: (base64: string) => void;
   onStream?: (stream: MediaStream) => void;
-  onSidStream?: (sid: string, stream: MediaStream) => void;
+  onSfuStream?: (sid: string, stream: MediaStream) => void;
   onMetadata?: (metadata: VideoMetadata) => void;
   onProgress?: (received: number, total: number, type: CmdType) => void;
   onVideoDownloaded?: (file: Uint8Array) => void;
@@ -158,7 +158,7 @@ export class PiCamera implements IPiCamera {
     });
 
     this.cmdPeer.onStream = (stream) => this.onStream?.(stream);
-    this.cmdPeer.onSidStream = (sid, stream) => this.onSidStream?.(sid, stream);
+    this.cmdPeer.onSfuStream = (sid, stream) => this.onSfuStream?.(sid, stream);
     this.cmdPeer.onIceCandidate = (ice) => conn.send('ice', JSON.stringify(ice.candidate));
     this.cmdPeer.onConnectionStateChange = (state) => {
       this.onConnectionState?.(state);
@@ -211,7 +211,7 @@ export class PiCamera implements IPiCamera {
 
       this.subPeer = new SubscriberPeer(config);
       this.subPeer.onStream = (stream) => this.onStream?.(stream);
-      this.subPeer.onSidStream = (sid, stream) => this.onSidStream?.(sid, stream);
+      this.subPeer.onSfuStream = (sid, stream) => this.onSfuStream?.(sid, stream);
       this.subPeer.onIceCandidate = (ev) => {
         if (ev.candidate?.candidate) {
           conn.send('trickleSubscriber', ev.candidate?.candidate);
