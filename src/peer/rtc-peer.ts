@@ -15,7 +15,7 @@ export class RtcPeer {
   readonly options: IPiCameraOptions;
   protected peer: RTCPeerConnection;
   private localStream?: MediaStream;
-  private remoteStream?: MediaStream;
+  private remoteStreamMap: Map<string, MediaStream> = new Map();
   private pendingIceCandidates: RTCIceCandidateInit[] = [];
 
   constructor(config: RtcPeerConfig) {
@@ -42,10 +42,12 @@ export class RtcPeer {
     });
     this.localStream = undefined;
 
-    this.remoteStream?.getTracks().forEach(track => {
-      track.stop();
+    this.remoteStreamMap.forEach(stream => {
+      stream.getTracks().forEach(track => {
+        track.stop();
+      });
     });
-    this.remoteStream = undefined;
+    this.remoteStreamMap.clear();
 
     this.peer.close();
     this.peer.ontrack = null;
@@ -111,12 +113,14 @@ export class RtcPeer {
 
   toggleMic = (enabled: boolean = !this.options.isMicOn) => {
     this.options.isMicOn = enabled;
-    this.toggleTrack(this.options.isMicOn, this.localStream);
+    this.toggleTrack(enabled, this.localStream);
   };
 
   toggleSpeaker = (enabled: boolean = !this.options.isSpeakerOn) => {
     this.options.isSpeakerOn = enabled;
-    this.toggleTrack(this.options.isSpeakerOn, this.remoteStream);
+    this.remoteStreamMap.forEach((remoteStream) => {
+      this.toggleTrack(enabled, remoteStream);
+    });
   };
 
   private toggleTrack = (isOn: boolean, stream?: MediaStream) => {
@@ -126,21 +130,25 @@ export class RtcPeer {
   };
 
   private handleTrack = (event: RTCTrackEvent) => {
-    if (!this.remoteStream) {
-      this.remoteStream = new MediaStream();
+    const [sid] = event.streams[0].id.split('|');
+
+    let remoteStream = this.remoteStreamMap.get(sid);
+
+    if (!remoteStream) {
+      remoteStream = new MediaStream();
+      this.remoteStreamMap.set(sid, remoteStream);
     }
 
     event.streams[0].getTracks().forEach((track) => {
-      this.remoteStream?.addTrack(track);
+      remoteStream?.addTrack(track);
       if (track.kind === "audio") {
         track.enabled = this.options.isSpeakerOn ?? false;
       }
 
-      console.debug(`get ${track.kind} tracks => label: ${track.label}, id: ${track.id}`);
+      console.debug(`[${sid}] get ${track.kind} tracks => label: ${track.label}, id: ${track.id}`);
     });
 
-    const [sid] = event.streams[0].id.split('|');
-    this.onStream?.(this.remoteStream);
-    this.onSfuStream?.(sid, this.remoteStream);
+    this.onStream?.(remoteStream);
+    this.onSfuStream?.(sid, remoteStream);
   }
 }
