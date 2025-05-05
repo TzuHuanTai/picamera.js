@@ -176,6 +176,7 @@ You can find the demo source code here: [index.html](demo/index.html)
     signaling: 'websocket',
     websocketUrl: 'wss://api.picamera.live',
     apiKey: 'your-api-key',
+    roomId: 'the-room-name'
   });
 
   conn.onSfuStream = (sid, stream) => {
