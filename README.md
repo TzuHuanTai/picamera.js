@@ -136,7 +136,7 @@ You can find the demo source code here: [index.html](demo/index.html)
 
 - ### Set camera properties while streaming
 
-  This example only set auto-focus and auto white balance. Other properties see `CameraPropertyType`.
+  This example only set auto-focus and auto white balance. Other properties see `CameraPropertyKey`.
 
   ```javascript
   let videoRef = document.getElementById('videoElement');
@@ -158,7 +158,7 @@ You can find the demo source code here: [index.html](demo/index.html)
 
   // click the button with onclick="setAwb()" when it's connected
   setAwb = () => {
-    conn.setCameraProperty(CameraPropertyType.AWB_MODE, AwbModeEnum.AwbCloudy);
+    conn.setCameraProperty(CameraPropertyKey.AWB_MODE, AwbModeEnum.AwbCloudy);
   }
 
   // click the button with onclick="setAf()" when it's connected
@@ -475,7 +475,7 @@ Available flags for initialization.
 
 - ### setCameraProperty
 
-  `.setCameraProperty(key: CameraPropertyType, value: CameraPropertyValue)` 
+  `.setCameraProperty(key: CameraPropertyKey, value: CameraPropertyValue)` 
   
   Sets camera properties, such as 3A or so.
 

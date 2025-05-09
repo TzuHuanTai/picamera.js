@@ -1,7 +1,7 @@
 import { MqttClient } from './signaling/mqtt-client';
 import { keepOnlyCodec } from './utils/rtc-tools';
 import { IPiCamera, IPiCameraOptions, ISignalingClient } from './signaling/signaling-client';
-import { CameraPropertyType, CameraPropertyValue } from './constants/camera-property';
+import { CameraPropertyKey, CameraPropertyValue } from './constants/camera-property';
 import { Participant, Quality, RoomInfo, Speaking, WebSocketClient } from './signaling/websocket-client';
 import { CmdType, VideoMetadata } from './rtc/cmd-message';
 import { RtcPeerConfig } from './peer/rtc-peer';
@@ -98,7 +98,7 @@ export class PiCamera implements IPiCamera {
     }
   }
 
-  setCameraProperty = (key: CameraPropertyType, value: CameraPropertyValue) => {
+  setCameraProperty = (key: CameraPropertyKey, value: CameraPropertyValue) => {
     this.cmdPeer?.setCameraProperty(key, value);
   }
 

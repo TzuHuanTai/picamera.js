@@ -1,4 +1,4 @@
-import { CameraPropertyType, CameraPropertyValue } from "../constants/camera-property";
+import { CameraPropertyKey, CameraPropertyValue } from "../constants/camera-property";
 
 export enum CmdType {
   CONNECT,
@@ -51,10 +51,10 @@ export type VideoMetadata = {
 }
 
 export class CameraCtrlMessage {
-  key: CameraPropertyType;
+  key: CameraPropertyKey;
   value: CameraPropertyValue;
 
-  constructor(key: CameraPropertyType, value: CameraPropertyValue) {
+  constructor(key: CameraPropertyKey, value: CameraPropertyValue) {
     this.key = key;
     this.value = value;
   }

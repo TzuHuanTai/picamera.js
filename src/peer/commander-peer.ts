@@ -1,4 +1,4 @@
-import { CameraPropertyType, CameraPropertyValue } from "../constants/camera-property";
+import { CameraPropertyKey, CameraPropertyValue } from "../constants/camera-property";
 import { arrayBufferToBase64, arrayBufferToString, padZero } from "../utils/rtc-tools";
 import { CameraCtrlMessage, CmdMessage, CmdType, MetaCmdMessage, MetadataCmd, VideoMetadata } from "../rtc/cmd-message";
 import { DataChannelReceiver } from "../rtc/datachannel-receiver";
@@ -110,7 +110,7 @@ export class CommanderPeer extends RtcPeer {
     }
   }
 
-  setCameraProperty = (key: CameraPropertyType, value: CameraPropertyValue) => {
+  setCameraProperty = (key: CameraPropertyKey, value: CameraPropertyValue) => {
     if (this.cmdDataChannel?.readyState === 'open') {
       const ctl = new CameraCtrlMessage(key, value);
       const command = new CmdMessage(CmdType.CAMERA_CONTROL, JSON.stringify(ctl));

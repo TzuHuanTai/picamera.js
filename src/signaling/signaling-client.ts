@@ -1,6 +1,6 @@
 
 import { CodecType } from '../utils/rtc-tools';
-import { CameraPropertyType, CameraPropertyValue } from '../constants/camera-property';
+import { CameraPropertyKey, CameraPropertyValue } from '../constants/camera-property';
 import { CmdType, VideoMetadata } from '../rtc/cmd-message';
 import { IMqttConnectionOptions, MqttTopicType } from './mqtt-client';
 import { IWebSocketConnectionOptions, Participant, Quality, RoomInfo, Speaking, WebsocketActionType } from './websocket-client';
@@ -163,7 +163,7 @@ export interface IPiCamera extends IPiCameraEvents {
    * @param key Camera property type
    * @param value Value of the camera property
    */
-  setCameraProperty(key: CameraPropertyType, value: CameraPropertyValue): void;
+  setCameraProperty(key: CameraPropertyKey, value: CameraPropertyValue): void;
 
   /**
    * Requests a snapshot image from the server.
