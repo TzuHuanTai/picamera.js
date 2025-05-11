@@ -4,6 +4,7 @@ import { CameraPropertyKey, CameraPropertyValue } from '../constants/camera-prop
 import { CmdType, VideoMetadata } from '../rtc/cmd-message';
 import { IMqttConnectionOptions, MqttTopicType } from './mqtt-client';
 import { IWebSocketConnectionOptions, Participant, Quality, RoomInfo, Speaking, WebsocketActionType } from './websocket-client';
+import { ChannelId, IpcMode } from '../peer/rtc-peer';
 
 type SignalingType = 'mqtt' | 'websocket';
 
@@ -15,6 +16,7 @@ export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConn
   turnPassword?: string;
   timeout?: number;
   datachannelOnly?: boolean;
+  ipcMode?: IpcMode;
   isMicOn?: boolean;
   isSpeakerOn?: boolean;
   credits?: boolean;
@@ -45,9 +47,9 @@ export interface IPiCameraEvents {
   /**
    * Emitted when the data channel is successfully opened.
    *
-   * @param dataChannel - The opened RTCDataChannel instance for data communication.
+   * @param dataChannel - The Id of the opened RTCDataChannel.
    */
-  onDatachannel?: (dataChannel: RTCDataChannel | any) => void;
+  onDatachannel?: (id: ChannelId) => void;
 
   /**
    * If any data transfer by datachannel, the on progress will give the received/total info.
@@ -84,6 +86,13 @@ export interface IPiCameraEvents {
    * @returns 
    */
   onVideoDownloaded?: (file: Uint8Array) => void;
+
+  /**
+ * Emitted when a IPC message is received.
+ * 
+ * @param msg - The string message received from the remote peer.
+ */
+  onMessage?: (msg: string) => void;
 
   /**
    * Emitted when the P2P connection cannot be established within the allotted time. 
@@ -171,6 +180,13 @@ export interface IPiCamera extends IPiCameraEvents {
    * @param quality - The range from `0` to `100`, determines the image quality. The default value is `30`.
    */
   snapshot(quality?: number): void;
+
+  /**
+   * Send a message to the server for IPC.
+   * 
+   * @param msg - The custom contents.
+   */
+  sendMessage(msg: string): void;
 
   /**
    * Toggles the **local** audio stream on or off. If an argument is provided, it will force the state to the specified value, otherwise, the current state will be toggled.

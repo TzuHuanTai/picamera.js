@@ -1,6 +1,25 @@
 import { IPiCameraOptions } from "../signaling/signaling-client";
 
-type DataChannelLabel = 'cmd_channel' | '_lossy' | '_reliable';
+type ChannelLabel = 'command' | '_lossy' | '_reliable';
+
+export enum ChannelId {
+  Command,
+  Lossy,
+  Reliable
+};
+
+export const ChannelLabelMap: Record<ChannelId, ChannelLabel> = {
+  [ChannelId.Command]: 'command',
+  [ChannelId.Lossy]: '_lossy',
+  [ChannelId.Reliable]: '_reliable'
+};
+
+export type IpcMode = 'lossy' | 'reliable';
+
+export const IpcModeTable: Record<IpcMode, number> = {
+  lossy: ChannelId.Lossy,
+  reliable: ChannelId.Reliable
+};
 
 export interface RtcPeerConfig extends RTCConfiguration {
   options: IPiCameraOptions;
@@ -60,8 +79,8 @@ export class RtcPeer {
     console.debug("webrtc peer is closed.");
   }
 
-  createDataChannel(label: DataChannelLabel, options?: RTCDataChannelInit) {
-    return this.peer.createDataChannel(label, options);
+  createDataChannel(id: ChannelId, options?: RTCDataChannelInit) {
+    return this.peer.createDataChannel(ChannelLabelMap[id], options);
   }
 
   createOffer = async (options?: RTCOfferOptions) => {

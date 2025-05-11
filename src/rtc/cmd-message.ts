@@ -7,7 +7,7 @@ export enum CmdType {
   RECORDING,
   CAMERA_CONTROL,
   BROADCAST,
-  UNKNOWN
+  CUSTOM
 };
 
 export enum MetadataCmd {

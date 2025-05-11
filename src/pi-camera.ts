@@ -4,7 +4,7 @@ import { IPiCamera, IPiCameraOptions, ISignalingClient } from './signaling/signa
 import { CameraPropertyKey, CameraPropertyValue } from './constants/camera-property';
 import { Participant, Quality, RoomInfo, Speaking, WebSocketClient } from './signaling/websocket-client';
 import { CmdType, VideoMetadata } from './rtc/cmd-message';
-import { RtcPeerConfig } from './peer/rtc-peer';
+import { ChannelId, RtcPeerConfig } from './peer/rtc-peer';
 import { CommanderPeer } from './peer/commander-peer';
 import { SubscriberPeer } from './peer/subscriber-peer';
 import { PublisherPeer } from './peer/publisher-peer';
@@ -12,13 +12,14 @@ import { DEFAULT } from './constants';
 
 export class PiCamera implements IPiCamera {
   onConnectionState?: (state: RTCPeerConnectionState) => void;
-  onDatachannel?: (cmdDataChannel: RTCDataChannel) => void;
+  onDatachannel?: (id: ChannelId) => void;
   onSnapshot?: (base64: string) => void;
   onStream?: (stream: MediaStream) => void;
   onSfuStream?: (sid: string, stream: MediaStream) => void;
   onMetadata?: (metadata: VideoMetadata) => void;
   onProgress?: (received: number, total: number, type: CmdType) => void;
   onVideoDownloaded?: (file: Uint8Array) => void;
+  onMessage?: (msg: string) => void;
   onTimeout?: () => void;
 
   onRoomInfo?: (room: RoomInfo) => void;
@@ -106,6 +107,10 @@ export class PiCamera implements IPiCamera {
     this.cmdPeer?.snapshot(quality);
   }
 
+  sendMessage = (msg: string) => {
+    this.cmdPeer?.sendMessage(msg);
+  }
+
   toggleMic = (enabled: boolean = !this.options.isMicOn) => {
     this.cmdPeer?.toggleMic(enabled);
     this.pubPeer?.toggleMic(enabled);
@@ -173,7 +178,8 @@ export class PiCamera implements IPiCamera {
     this.cmdPeer.onMetadata = (metadata) => this.onMetadata?.(metadata);
     this.cmdPeer.onProgress = (received, total, type) => this.onProgress?.(received, total, type);
     this.cmdPeer.onVideoDownloaded = (file) => this.onVideoDownloaded?.(file);
-    this.cmdPeer.onDatachannel = (dc) => this.onDatachannel?.(dc);
+    this.cmdPeer.onDatachannel = (id) => this.onDatachannel?.(id);
+    this.cmdPeer.onMessage = (msg) => this.onMessage?.(msg);
 
     conn.onIceCandidate = (ice) => this.cmdPeer?.addIceCandidate(ice);
     conn.onAnswer = (sdp) => this.cmdPeer?.setRemoteDescription(sdp);

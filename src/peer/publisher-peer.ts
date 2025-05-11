@@ -1,10 +1,10 @@
-import { RtcPeer, RtcPeerConfig } from "./rtc-peer";
+import { ChannelId, RtcPeer, RtcPeerConfig } from "./rtc-peer";
 
 export class PublisherPeer extends RtcPeer {
   constructor(config: RtcPeerConfig) {
     super(config);
-    super.createDataChannel('_reliable', { ordered: true });
-    super.createDataChannel('_lossy', { ordered: true, maxRetransmits: 0 });
+    super.createDataChannel(ChannelId.Reliable, { ordered: true });
+    super.createDataChannel(ChannelId.Lossy, { ordered: true, maxRetransmits: 0 });
     console.debug("PublisherPeer created.");
   }
 }
