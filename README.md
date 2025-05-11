@@ -5,32 +5,42 @@
     PiCamera.js
 </h1>
 
-This package provides the JavaScript client-side implementation for [pi_webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC), a project designed to enable WebRTC-based real-time video and audio streaming on a Raspberry Pi.
+JavaScript client for [pi-webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC) — stream low-latency video/audio from Raspberry Pi using native WebRTC with hardware H.264 (V4L2) or OpenH264.
 
-# Installation
+Supports P2P, SFU, DataChannel control, and snapshot/file transfer over WebRTC.
+
+## Installation
 
 ```
 npm install picamera.js
 ```
 
-# Usage
+## Usage
 
-Online demo: https://tzuhuantai.github.io/picamera.js/demo/
+Check out the online demo: [Live Demo](https://tzuhuantai.github.io/picamera.js/demo/)
 
-You can find the demo source code here: [index.html](demo/index.html)
+You can also view the demo source code here: [index.html](demo/index.html).
 
-- Example
-  - [Live video](#live-video)
-  - [Capture a snapshot only](#capture-a-snapshot-only)
-  - [Download the latest video record](#download-the-latest-video-record)
-  - [Set camera properties while streaming](#set-camera-properties-while-streaming)
-  - [Watch videos via the SFU server](#watch-videos-via-the-sfu-server)
-- [Notes on local IP or VPN address](#notes-on-local-ip-or-vpn-address)
-- [Notes on Mosquitto](#notes-on-mosquitto)
-- [Notes on self-signed certificates](#notes-on-self-signed-certificates)
-- [API](#api)
+### Examples:
+- [Live video](#live-video)
+- [Capture a snapshot only](#capture-a-snapshot-only)
+- [Send message for IPC via DataChannel](#send-message-for-ipc-via-datachannel)
+- [Download the latest video record](#download-the-latest-video-record)
+- [Set camera properties while streaming](#set-camera-properties-while-streaming)
+- [Watch videos via the SFU server](#watch-videos-via-the-sfu-server)
 
-# Example
+### Notes:
+- [Local IP or VPN address](#notes-on-local-ip-or-vpn-address)
+- [Mosquitto](#notes-on-mosquitto)
+- [Self-signed certificates](#notes-on-self-signed-certificates)
+
+## API
+
+[API Documentation](#api-documentation)
+
+## Example
+
+These examples show how to use individual features separately.
 
 - ### Live video
 
@@ -75,13 +85,45 @@ You can find the demo source code here: [index.html](demo/index.html)
     datachannelOnly: true,
   });
 
-  conn.onDatachannel = (dc) => {
+  conn.onDatachannel = (id) => {
     // on connected to remote datachannel
-    conn.snapshot();
+    if (id === ChannelId.Command)
+      conn.snapshot();
   }
 
   conn.onSnapshot = (image) => {
     // get a base64 image here, then terminate the connection.
+    conn.terminate();
+  }
+
+  conn.connect();
+  ```
+
+- ### Send message for IPC via DataChannel
+
+  Use WebRTC DataChannel to send messages to a Unix domain socket on the Raspberry Pi. This allows sending custom messages for inter-process communication (IPC).
+
+  ```javascript
+  let conn = new PiCamera({
+    deviceUid: 'your-custom-uid',
+    mqttHost: 'your.mqtt.cloud',
+    mqttPath: '/mqtt',
+    mqttPort: '8884', // Websocket Port
+    mqttUsername: 'hakunamatata',
+    mqttPassword: 'Wonderful',
+    stunUrls: ["stun:stun1.l.google.com:19302"],
+    datachannelOnly: true,
+    ipcMode: 'reliable'
+  });
+
+  conn.onDatachannel = (id) => {
+    // on connected to remote datachannel
+    if (id === ChannelId.Reliable)
+      conn.sendMessage('Hello Reliable Channel!');
+  }
+
+  conn.onMessage = (msg) => {
+    // get a response msg here.
     conn.terminate();
   }
 
@@ -101,10 +143,10 @@ You can find the demo source code here: [index.html](demo/index.html)
     datachannelOnly: true,
     stunUrls: ["stun:stun1.l.google.com:19302"],
   });
-    
+
   conn.onDatachannel = () => {
     // connected to remote datachannel and request the latest file.
-    piCameraRef.current?.getRecordingMetadata();
+    conn.getRecordingMetadata();
   }
 
   conn.onMetadata = (metadata) => {
@@ -163,19 +205,21 @@ You can find the demo source code here: [index.html](demo/index.html)
 
   // click the button with onclick="setAf()" when it's connected
   setAf = () => {
-    conn.setCameraProperty(CameraPropertynType.AF_MODE, AfModeEnum.AfModeContinuous);
+    conn.setCameraProperty(CameraPropertyKey.AF_MODE, AfModeEnum.AfModeContinuous);
   }
   ```
 
 - ### Watch videos via the SFU server
 
+  This example demonstrates how to watch a live stream through an SFU server.
+For more details, see [Broadcasting Live Stream to 1,000+ Viewers via SFU](https://github.com/TzuHuanTai/RaspberryPi-WebRTC/wiki/Advanced-Settings#broadcasting-live-stream-to-1000-viewers-via-sfu).
   ```javascript
   let videoRef = document.getElementById('videoElement');
 
   let conn = new PiCamera({
     signaling: 'websocket',
-    websocketUrl: 'wss://api.picamera.live',
-    apiKey: 'your-api-key',
+    websocketUrl: 'wss://free1-api.picamera.live',
+    apiKey: 'APIz3LVTsM2bmNi',
     roomId: 'the-room-name'
   });
 
@@ -186,10 +230,10 @@ You can find the demo source code here: [index.html](demo/index.html)
   conn.connect();
   ```
 
-# Notes on local IP or VPN address
+## Notes on local IP or VPN address
 When running PiCamera.js over a local network or a VPN, set `stunUrls` to `null` or leave it out of the configuration altogether.
 
-# Notes on Mosquitto
+## Notes on Mosquitto
 When running Mosquitto as your own MQTT server, we have experienced problems running Mosquitto with self-signed certificates with the MQTT client in PiCamera.js. Instead, run Mosquitto without SSL and then interpose nginx. For example:
 
 ```
@@ -286,11 +330,11 @@ let conn = new PiCamera({
 });
 ```
 
-# Notes on self-signed certificates
+## Notes on self-signed certificates
 
 Most browsers require https for video to work. When using self-signed certificates, you first need to accept the browser's warning about the certificate. You also need to do this explicitly for the websocket host/port. In the above example, you would have to open https://your.mqtt.cloud:8884/ and accept the warning before the example works. Keep on eye on the browser's console to pick up on errors about self-signed certificates and open the `wss://` URLs it complains about as `https://` to accept the self-signed certificates.
 
-# API
+## API Documentation
 
 * [Options](#options)
 * [Events](#events)
@@ -302,6 +346,7 @@ Most browsers require https for video to work. When using self-signed certificat
   * [onSnapshot](#onSnapshot)
   * [onMetadata](#onmetadata)
   * [onVideoDownloaded](#onvideodownloaded)
+  * [onMessage](#onmessage)
   * [onTimeout](#onTimeout)
   * [onRoomInfo](#onroominfo)
   * [onQuility](#onquility)
@@ -315,6 +360,7 @@ Most browsers require https for video to work. When using self-signed certificat
   * [fetchRecordedVideo](#fetchrecordedvideo)
   * [setCameraProperty](#setcameraproperty)
   * [snapshot](#snapshot)
+  * [sendMessage](#sendmessage)
   * [toggleMic](#toggleMic)
   * [toggleSpeaker](#toggleSpeaker)
 
@@ -342,6 +388,7 @@ Available flags for initialization.
 | turnPassword    | `string`   |         | The password for the TURN server.                            |
 | timeout         | `number`   | `10000` | The connection timeout in milliseconds (`ms`).               |
 | datachannelOnly | `boolean`  | `false` | Specifies that the connection is only for data transfer, without media streams. |
+| ipcMode         | `string`  |          | Defines the communication mode for `sendMessage()` in IPC (inter-process communication). Accepts `lossy` (UDP-like) or `reliable` (TCP-like) modes. |
 | isMicOn         | `boolean`  | `true`  | Enables the local microphone stream by default if the connection is established. |
 | isSpeakerOn     | `boolean`  | `true`  | Enables the remote audio stream by default if the connection is established. |
 | credits         | `boolean`  | `true`  | Show watermark to run it under credits.                      |
@@ -356,7 +403,7 @@ Available flags for initialization.
 
 - ### onDatachannel
 
-  `= (dataChannel: RTCDataChannel) => {}`
+  `= (id: ChannelId) => {}`
 
   Emitted when the data channel successfully opens for data communication.
 
@@ -401,6 +448,12 @@ Available flags for initialization.
   `= () => {}`
 
   Emitted when the P2P connection cannot be established within the allotted time. Automatically calls the `terminate()` function.
+
+- ### onMessage
+
+  `= (msg: string) => {}`
+
+  Read IPC message from server.
 
 - ### onRoomInfo
 
@@ -486,6 +539,12 @@ Available flags for initialization.
    Requests a snapshot image from the server.
 
   - `quality` - The range from `0` to `100`, determines the image quality. The default value is `30`.
+
+- ### sendMessage
+
+  `.(msg: string)`
+  
+  If `ipcMode` is set to `reliable`, the message will be retransmitted until successfully delivered. If set to `lossy`, the message may be lost, but with lower latency.
 
 - ### toggleMic
 

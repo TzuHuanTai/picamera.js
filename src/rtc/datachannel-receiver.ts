@@ -1,13 +1,24 @@
 import { arrayBufferToString } from "../utils/rtc-tools";
 
+export type OnProgress = (received: number, total: number) => void;
+export type OnComplete = (body: Uint8Array) => void;
+
+export interface ReceiverEvent {
+  onProgress?: OnProgress;
+  onComplete: OnComplete;
+}
+
 export class DataChannelReceiver {
   private receivedLength: number;
   private isFirstPacket: boolean;
   private fileBuffer: Uint8Array;
-  private onComplete: (received: number, body: Uint8Array) => void;
 
-  constructor(onComplete: (progress: number, body: Uint8Array) => void) {
-    this.onComplete = onComplete;
+  private onProgress?: OnProgress;
+  private onComplete: OnComplete;
+
+  constructor(event: ReceiverEvent) {
+    this.onProgress = event.onProgress;
+    this.onComplete = event.onComplete;
     this.fileBuffer = new Uint8Array();
     this.receivedLength = 0;
     this.isFirstPacket = true;
@@ -22,7 +33,12 @@ export class DataChannelReceiver {
     } else {
       this.fileBuffer.set(packet, this.receivedLength);
       this.receivedLength += packet.length;
-      this.onComplete(this.receivedLength, this.fileBuffer);
+
+      this.onProgress?.(this.receivedLength, this.fileBuffer.length);
+
+      if (this.receivedLength === this.fileBuffer.length) {
+        this.onComplete(this.fileBuffer);
+      }
     }
   }
 

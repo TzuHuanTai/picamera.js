@@ -1,8 +1,8 @@
 import { CameraPropertyKey, CameraPropertyValue } from "../constants/camera-property";
-import { arrayBufferToBase64, arrayBufferToString, padZero } from "../utils/rtc-tools";
+import { arrayBufferToBase64, arrayBufferToString, padZero, utf8ArrayToString } from "../utils/rtc-tools";
 import { CameraCtrlMessage, CmdMessage, CmdType, MetaCmdMessage, MetadataCmd, VideoMetadata } from "../rtc/cmd-message";
 import { DataChannelReceiver } from "../rtc/datachannel-receiver";
-import { RtcPeer, RtcPeerConfig } from "./rtc-peer";
+import { ChannelId, RtcPeer, RtcPeerConfig } from "./rtc-peer";
 
 export class CommanderPeer extends RtcPeer {
 
@@ -10,9 +10,11 @@ export class CommanderPeer extends RtcPeer {
   onMetadata?: (metadata: VideoMetadata) => void;
   onProgress?: (received: number, total: number, type: CmdType) => void;
   onVideoDownloaded?: (file: Uint8Array) => void;
-  onDatachannel?: (cmdDataChannel: RTCDataChannel) => void;
+  onDatachannel?: (id: ChannelId) => void;
+  onMessage?: (msg: string) => void;
 
-  private cmdDataChannel?: RTCDataChannel;
+  private cmdChannel: RTCDataChannel;
+  private ipcChannel?: RTCDataChannel;
 
   constructor(config: RtcPeerConfig) {
     super(config);
@@ -23,7 +25,14 @@ export class CommanderPeer extends RtcPeer {
       this.peer.addTransceiver("video", { direction: "recvonly" });
       this.peer.addTransceiver("audio", { direction: "sendrecv" });
     }
-    this.createCmdDataChannel();
+
+    this.cmdChannel = this.createDataChannel(ChannelId.Command);
+    if (config.options.ipcMode === 'lossy') {
+      this.ipcChannel = this.createDataChannel(ChannelId.Lossy);
+    } else if (config.options.ipcMode === 'reliable') {
+      this.ipcChannel = this.createDataChannel(ChannelId.Reliable);
+    }
+
     console.debug("CommanderPeer is created.");
   }
 
@@ -32,14 +41,12 @@ export class CommanderPeer extends RtcPeer {
     this.metadataReceiver.reset();
     this.recordingReceiver.reset();
 
-    if (this.cmdDataChannel) {
-      if (this.cmdDataChannel.readyState === 'open') {
-        const command = new CmdMessage(CmdType.CONNECT, "false");
-        this.cmdDataChannel.send(command.ToString());
-      }
-      this.cmdDataChannel.close();
-      this.cmdDataChannel = undefined;
+    if (this.cmdChannel.readyState === 'open') {
+      const command = new CmdMessage(CmdType.CONNECT, "false");
+      this.cmdChannel.send(command.ToString());
     }
+    this.cmdChannel.close();
+    this.ipcChannel?.close();
 
     this.onSnapshot = undefined;
     this.onMetadata = undefined;
@@ -51,23 +58,25 @@ export class CommanderPeer extends RtcPeer {
     console.debug("CommanderPeer is closed.");
   }
 
-  createCmdDataChannel = () => {
-    this.cmdDataChannel = super.createDataChannel('cmd_channel', {
-      negotiated: true,
+  public createDataChannel = (channelId: ChannelId) => {
+    const options: RTCDataChannelInit = {
+      id: channelId,
       ordered: true,
-      id: 0,
-    });
-
-    this.cmdDataChannel.binaryType = "arraybuffer";
-    this.cmdDataChannel.onopen = () => {
-      if (this.onDatachannel && this.cmdDataChannel) {
-        this.onDatachannel(this.cmdDataChannel);
-      }
+      negotiated: true,
     };
 
-    this.cmdDataChannel.onmessage = e => {
+    if (channelId === ChannelId.Lossy) {
+      options.maxRetransmits = 0;
+    }
+
+    const dataChannel = super.createDataChannel(channelId, options);
+
+    dataChannel.binaryType = "arraybuffer";
+    dataChannel.onopen = () => this.onDatachannel?.(channelId);
+
+    dataChannel.onmessage = (e) => {
       const packet = new Uint8Array(e.data as ArrayBuffer);
-      const header = packet[0];
+      const header = packet[0] as CmdType;
       const body = packet.slice(1);
 
       switch (header) {
@@ -80,12 +89,17 @@ export class CommanderPeer extends RtcPeer {
         case CmdType.RECORDING:
           this.recordingReceiver.receiveData(body);
           break;
+        case CmdType.CUSTOM:
+          this.customReceiver.receiveData(body);
+          break;
       }
     };
+
+    return dataChannel;
   }
 
   getRecordingMetadata = (param?: string | Date) => {
-    if (this.cmdDataChannel?.readyState === 'open' && this.onMetadata) {
+    if (this.cmdChannel.readyState === 'open' && this.onMetadata) {
       let metaCmd: MetaCmdMessage;
 
       if (param === undefined) {
@@ -99,64 +113,55 @@ export class CommanderPeer extends RtcPeer {
       }
 
       const command = new CmdMessage(CmdType.METADATA, metaCmd.ToString());
-      this.cmdDataChannel.send(command.ToString());
+      this.cmdChannel.send(command.ToString());
     }
   }
 
   fetchRecordedVideo = (path: string) => {
-    if (this.onVideoDownloaded && this.cmdDataChannel?.readyState === 'open') {
+    if (this.onVideoDownloaded && this.cmdChannel.readyState === 'open') {
       const command = new CmdMessage(CmdType.RECORDING, path);
-      this.cmdDataChannel.send(command.ToString());
+      this.cmdChannel.send(command.ToString());
     }
   }
 
   setCameraProperty = (key: CameraPropertyKey, value: CameraPropertyValue) => {
-    if (this.cmdDataChannel?.readyState === 'open') {
+    if (this.cmdChannel.readyState === 'open') {
       const ctl = new CameraCtrlMessage(key, value);
       const command = new CmdMessage(CmdType.CAMERA_CONTROL, JSON.stringify(ctl));
-      this.cmdDataChannel.send(command.ToString());
+      this.cmdChannel.send(command.ToString());
     }
   }
 
   snapshot = (quality: number = 30) => {
-    if (this.onSnapshot && this.cmdDataChannel?.readyState === 'open') {
+    if (this.onSnapshot && this.cmdChannel.readyState === 'open') {
       quality = Math.max(0, Math.min(quality, 100));
       const command = new CmdMessage(CmdType.SNAPSHOT, String(quality));
-      this.cmdDataChannel.send(command.ToString());
+      this.cmdChannel.send(command.ToString());
     }
   }
 
-  private snapshotReceiver = new DataChannelReceiver((received, body) => {
-    if (this.onProgress) {
-      this.onProgress(received, body.length, CmdType.SNAPSHOT);
-    }
+  sendMessage = (msg: string) => {
+    const command = new CmdMessage(CmdType.CUSTOM, msg);
+    this.ipcChannel?.send(command.ToString());
+  }
 
-    if (received === body.length && this.onSnapshot) {
-      if (this.onSnapshot) {
-        this.onSnapshot("data:image/jpeg;base64," + arrayBufferToBase64(body));
-      }
-    }
+  private snapshotReceiver = new DataChannelReceiver({
+    onProgress: (received, total) => this.onProgress?.(received, total, CmdType.SNAPSHOT),
+    onComplete: (body) => this.onSnapshot?.("data:image/jpeg;base64," + arrayBufferToBase64(body))
   });
 
-  private metadataReceiver = new DataChannelReceiver((received, body) => {
-    if (this.onProgress) {
-      this.onProgress(received, body.length, CmdType.METADATA);
-    }
-
-    if (received === body.length && this.onMetadata) {
-      let bodyStr = arrayBufferToString(body);
-      let parsedBody = JSON.parse(bodyStr) as VideoMetadata;
-      this.onMetadata(parsedBody);
-    }
+  private metadataReceiver = new DataChannelReceiver({
+    onProgress: (received, total) => this.onProgress?.(received, total, CmdType.METADATA),
+    onComplete: (body) => this.onMetadata?.(JSON.parse(arrayBufferToString(body)) as VideoMetadata)
   });
 
-  private recordingReceiver = new DataChannelReceiver((received, body) => {
-    if (this.onProgress) {
-      this.onProgress(received, body.length, CmdType.RECORDING);
-    }
+  private recordingReceiver = new DataChannelReceiver({
+    onProgress: (received, total) => this.onProgress?.(received, total, CmdType.RECORDING),
+    onComplete: (body) => this.onVideoDownloaded?.(body)
+  });
 
-    if (received === body.length && this.onVideoDownloaded) {
-      this.onVideoDownloaded(body);
-    }
+  private customReceiver = new DataChannelReceiver({
+    onProgress: (received, total) => this.onProgress?.(received, total, CmdType.CUSTOM),
+    onComplete: (body) => this.onMessage?.(utf8ArrayToString(body))
   });
 }
