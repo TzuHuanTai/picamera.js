@@ -25,6 +25,24 @@
       <button onclick="start()">Start</button>
       <button onclick="stop()">Stop</button>
     </div>
+
+    <hr>
+
+    <div>
+      <video id="sfuVideoElement" controls autoplay playsinline>
+        Your browser doesn't support HTML5 video.
+      </video>
+    </div>
+    <div>
+      <label>SFU url: <input type="text" id="websocketUrl" placeholder="SFU Websocket URL"
+          value="wss://free1-api.picamera.live"></label><br>
+      <label>API key: <input type="text" id="apiKey" placeholder="API Key" value="APIz3LVTsM2bmNi"></label><br>
+      <label>Room: <input type="text" id="roomId" placeholder="Room Id" value="the-room-name"></label><br>
+    </div>
+    <div>
+      <button onclick="join()">Join</button>
+      <button onclick="leave()">Leave</button>
+    </div>
   </div>
 
   <script type="module">
@@ -59,6 +77,35 @@
     window.stop = function stop() {
       if (conn) {
         conn.terminate();
+      }
+    };
+
+    // ========
+    // SFU demo 
+    // ========
+    let sfuVideoRef = document.getElementById('sfuVideoElement');
+    let sfuConn = null;
+
+    window.join = function join() {
+      const websocketUrl = document.getElementById('websocketUrl').value;
+      const apiKey = document.getElementById('apiKey').value;
+      const roomId = document.getElementById('roomId').value;
+
+      sfuConn = new PiCamera({
+        signaling: 'websocket',
+        websocketUrl: websocketUrl,
+        apiKey: apiKey,
+        roomId: roomId
+      });
+      sfuConn.onSfuStream = (sid, stream) => {
+        sfuVideoRef.srcObject = stream;
+      };
+      sfuConn.connect();
+    };
+
+    window.leave = function leave() {
+      if (sfuConn) {
+        sfuConn.terminate();
       }
     };
   </script>
