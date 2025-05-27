@@ -48,6 +48,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
+    "@livekit/protocol": "^1.38.0",
     "mqtt": "^5.10.1"
   }
 }
