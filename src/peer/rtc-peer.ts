@@ -1,6 +1,9 @@
+import { CmdType, VideoMetadata } from "../rtc/cmd-message";
+import { DataChannelReceiver } from "../rtc/datachannel-receiver";
 import { IPiCameraOptions } from "../signaling/signaling-client";
+import { arrayBufferToBase64, arrayBufferToString, utf8ArrayToString } from "../utils/rtc-tools";
 
-type ChannelLabel = 'command' | '_lossy' | '_reliable';
+export type ChannelLabel = 'command' | '_lossy' | '_reliable';
 
 export enum ChannelId {
   Command,
@@ -14,6 +17,12 @@ export const ChannelLabelMap: Record<ChannelId, ChannelLabel> = {
   [ChannelId.Reliable]: '_reliable'
 };
 
+export const LabelToChannelIdMap: Record<ChannelLabel, ChannelId> = {
+  'command': ChannelId.Command,
+  '_lossy': ChannelId.Lossy,
+  '_reliable': ChannelId.Reliable
+};
+
 export type IpcMode = 'lossy' | 'reliable';
 
 export const IpcModeTable: Record<IpcMode, number> = {
@@ -25,7 +34,20 @@ export interface RtcPeerConfig extends RTCConfiguration {
   options: IPiCameraOptions;
 }
 
+interface ChannelReceiverGroup {
+  snapshotReceiver: DataChannelReceiver;
+  metadataReceiver: DataChannelReceiver;
+  recordingReceiver: DataChannelReceiver;
+  customReceiver: DataChannelReceiver;
+}
+
 export class RtcPeer {
+  onSnapshot?: (base64: string) => void;
+  onMetadata?: (metadata: VideoMetadata) => void;
+  onProgress?: (received: number, total: number, type: CmdType) => void;
+  onVideoDownloaded?: (file: Uint8Array) => void;
+  onDatachannel?: (id: ChannelId) => void;
+  onMessage?: (msg: string) => void;
   onStream?: (stream: MediaStream) => void;
   onSfuStream?: (sid: string, stream: MediaStream) => void;
   onIceCandidate?: ((ev: RTCPeerConnectionIceEvent) => any);
@@ -36,6 +58,12 @@ export class RtcPeer {
   private localStream?: MediaStream;
   private remoteStreamMap: Map<string, MediaStream> = new Map();
   private pendingIceCandidates: RTCIceCandidateInit[] = [];
+  private channelReceivers: Record<ChannelLabel, ChannelReceiverGroup> = {} as Record<ChannelLabel, ChannelReceiverGroup>;
+
+  // @ts-ignore noUnusedLocals
+  private lossyChannel?: RTCDataChannel;
+  private reliableChannel?: RTCDataChannel;
+  // @ts-ignore noUnusedLocals
 
   constructor(config: RtcPeerConfig) {
     this.options = config.options;
@@ -49,6 +77,27 @@ export class RtcPeer {
     this.peer.onconnectionstatechange = () => {
       this.onConnectionStateChange?.(this.peer.connectionState);
     }
+
+
+    this.peer.ondatachannel = (dc) => {
+      const channel = dc.channel;
+      const label = channel.label as ChannelLabel;
+      const channelId = LabelToChannelIdMap[label];
+
+      if (
+        (channelId === ChannelId.Lossy && config.options.ipcMode === 'lossy') ||
+        (channelId === ChannelId.Reliable && config.options.ipcMode === 'reliable')
+      ) {
+        if (channelId === ChannelId.Lossy) {
+          this.lossyChannel = channel;
+        } else if (channelId === ChannelId.Reliable) {
+          this.reliableChannel = channel;
+        }
+
+        this.createReceivers(label);
+        channel.onmessage = (e) => this.onDataChannelMessage(label, e);
+      }
+    }
   }
 
   get connectionState() {
@@ -56,6 +105,24 @@ export class RtcPeer {
   }
 
   close() {
+    for (const label in this.channelReceivers) {
+      const group = this.channelReceivers[label as ChannelLabel];
+      group.snapshotReceiver.reset();
+      group.metadataReceiver.reset();
+      group.recordingReceiver.reset();
+      group.customReceiver.reset();
+    }
+    this.channelReceivers = {} as Record<ChannelLabel, ChannelReceiverGroup>;
+
+    if (this.lossyChannel) {
+      this.lossyChannel.onmessage = null;
+    }
+    if (this.reliableChannel) {
+      this.reliableChannel.onmessage = null;
+    }
+    this.lossyChannel = undefined;
+    this.reliableChannel = undefined;
+
     this.localStream?.getTracks().forEach(track => {
       track.stop();
     });
@@ -73,6 +140,11 @@ export class RtcPeer {
     this.peer.onicecandidate = null;
     this.peer.onconnectionstatechange = null;
 
+    this.onSnapshot = undefined;
+    this.onMetadata = undefined;
+    this.onProgress = undefined;
+    this.onVideoDownloaded = undefined;
+    this.onMessage = undefined;
     this.onStream = undefined;
     this.onIceCandidate = undefined;
     this.onConnectionStateChange = undefined;
@@ -169,5 +241,59 @@ export class RtcPeer {
 
     this.onStream?.(remoteStream);
     this.onSfuStream?.(sid, remoteStream);
+  }
+
+  protected createReceivers(label: ChannelLabel): void {
+
+    this.channelReceivers[label] = {
+      snapshotReceiver: new DataChannelReceiver({
+        onProgress: (received, total) => this.onProgress?.(received, total, CmdType.SNAPSHOT),
+        onComplete: (body) => this.onSnapshot?.("data:image/jpeg;base64," + arrayBufferToBase64(body))
+      }),
+      metadataReceiver: new DataChannelReceiver({
+        onProgress: (received, total) => this.onProgress?.(received, total, CmdType.METADATA),
+        onComplete: (body) => this.onMetadata?.(JSON.parse(arrayBufferToString(body)) as VideoMetadata)
+      }),
+      recordingReceiver: new DataChannelReceiver({
+        onProgress: (received, total) => this.onProgress?.(received, total, CmdType.RECORDING),
+        onComplete: (body) => this.onVideoDownloaded?.(body)
+      }),
+      customReceiver: new DataChannelReceiver({
+        onProgress: (received, total) => this.onProgress?.(received, total, CmdType.CUSTOM),
+        onComplete: (body) => this.onMessage?.(utf8ArrayToString(body))
+      }),
+    };
+  };
+
+  protected onDataChannelMessage(label: ChannelLabel, event: MessageEvent): void {
+    const data = new Uint8Array(event.data as ArrayBuffer);
+    this.dispatchPayload(label, data);
+  }
+
+  protected dispatchPayload(label: ChannelLabel, data: ArrayBuffer) {
+    const receivers = this.channelReceivers[label];
+    if (!receivers) {
+      console.warn(`No receivers found for label: ${label}`);
+      return;
+    }
+
+    const packet = new Uint8Array(data as ArrayBuffer);
+    const header = packet[0] as CmdType;
+    const body = packet.slice(1);
+
+    switch (header) {
+      case CmdType.SNAPSHOT:
+        receivers.snapshotReceiver.receiveData(body);
+        break;
+      case CmdType.METADATA:
+        receivers.metadataReceiver.receiveData(body);
+        break;
+      case CmdType.RECORDING:
+        receivers.recordingReceiver.receiveData(body);
+        break;
+      case CmdType.CUSTOM:
+        receivers.customReceiver.receiveData(body);
+        break;
+    }
   }
 }

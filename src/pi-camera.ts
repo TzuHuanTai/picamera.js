@@ -109,6 +109,7 @@ export class PiCamera implements IPiCamera {
 
   sendMessage = (msg: string) => {
     this.cmdPeer?.sendMessage(msg);
+    this.pubPeer?.sendMessage(msg);
   }
 
   toggleMic = (enabled: boolean = !this.options.isMicOn) => {
@@ -209,6 +210,7 @@ export class PiCamera implements IPiCamera {
       config.iceServers = [server];
 
       this.pubPeer = new PublisherPeer(config);
+      this.pubPeer.onDatachannel = (id) => this.onDatachannel?.(id);
       this.pubPeer.onIceCandidate = (ev) => {
         if (ev.candidate?.candidate) {
           conn.send('tricklePublisher', ev.candidate?.candidate);
@@ -216,6 +218,7 @@ export class PiCamera implements IPiCamera {
       }
 
       this.subPeer = new SubscriberPeer(config);
+      this.subPeer.onMessage = (msg) => this.onMessage?.(msg);
       this.subPeer.onStream = (stream) => this.onStream?.(stream);
       this.subPeer.onSfuStream = (sid, stream) => this.onSfuStream?.(sid, stream);
       this.subPeer.onIceCandidate = (ev) => {
