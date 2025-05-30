@@ -50,5 +50,6 @@
   "dependencies": {
     "@livekit/protocol": "^1.38.0",
     "mqtt": "^5.10.1"
-  }
+  },
+  "version": "0.0.1"
 }
