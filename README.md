@@ -560,11 +560,13 @@ Available flags for initialization.
 
 # License
 
-This project is licensed under the [AGPL-3.0-only](https://www.gnu.org/licenses/agpl-3.0.html) license. Under this license, anyone is free to use, modify, and distribute the code, but any use in network services or any modifications require the source code to be made public. Commercial usage without source code disclosure is not permitted.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
 
-### Commercial License
+Included Third-Party Licenses
+mqtt: MIT License
+@livekit/protocol: Apache License 2.0
+See the NOTICE file for full license texts of third-party dependencies.
 
-If your use case does not permit source code disclosure or you have other licensing requirements, a commercial license is available. This option exempts you from the AGPL's source code sharing requirements and includes dedicated support. The commercial license also enables optional features, such as removing watermarks or unlocking additional functionalities.
-
-For more information, please contact:
-📧 Email: [tzu.huan.tai@gmail.com](mailto:tzu.huan.tai@gmail.com)
+Commercial License
+If your use case does not permit compliance with the AGPL (e.g., source code disclosure), a commercial license is available.
+For more information, please contact: 📧 tzu.huan.tai@gmail.com
