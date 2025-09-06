@@ -40,7 +40,7 @@ export class PublisherPeer extends RtcPeer {
       }
     });
 
-    const encoded = packet.toBinary();
+     const encoded = new Uint8Array(packet.toBinary()).buffer;
 
     if (this.options.ipcMode === 'lossy') {
       if (this.pubLossyChannel.readyState === 'open') {

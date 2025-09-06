@@ -266,18 +266,16 @@ export class RtcPeer {
   };
 
   protected onDataChannelMessage(label: ChannelLabel, event: MessageEvent): void {
-    const data = new Uint8Array(event.data as ArrayBuffer);
-    this.dispatchPayload(label, data);
+    this.dispatchPayload(label, event.data);
   }
 
-  protected dispatchPayload(label: ChannelLabel, data: ArrayBuffer) {
+  protected dispatchPayload(label: ChannelLabel, packet: Uint8Array) {
     const receivers = this.channelReceivers[label];
     if (!receivers) {
       console.warn(`No receivers found for label: ${label}`);
       return;
     }
 
-    const packet = new Uint8Array(data as ArrayBuffer);
     const header = packet[0] as CmdType;
     const body = packet.slice(1);
 

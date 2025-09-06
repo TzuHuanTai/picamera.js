@@ -8,7 +8,7 @@ export class SubscriberPeer extends RtcPeer {
   }
 
   override async onDataChannelMessage(label: ChannelLabel, event: MessageEvent): Promise<void> {
-    let buffer: ArrayBuffer | undefined;
+    let buffer: ArrayBuffer;
     if (event.data instanceof ArrayBuffer) {
       buffer = event.data;
     } else if (event.data instanceof Blob) {
