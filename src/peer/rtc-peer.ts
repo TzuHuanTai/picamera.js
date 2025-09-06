@@ -1,6 +1,6 @@
+import { IPiCameraOptions } from "../pi-camera.types";
 import { CmdType, VideoMetadata } from "../rtc/cmd-message";
 import { DataChannelReceiver } from "../rtc/datachannel-receiver";
-import { IPiCameraOptions } from "../signaling/signaling-client";
 import { arrayBufferToBase64, arrayBufferToString, utf8ArrayToString } from "../utils/rtc-tools";
 
 export type ChannelLabel = 'command' | '_lossy' | '_reliable';

@@ -6,7 +6,7 @@ import {
 } from './constants/camera-property';
 import { ChannelId } from './peer/rtc-peer';
 import { PiCamera } from './pi-camera';
-import { IPiCameraOptions } from './signaling/signaling-client';
+import { IPiCameraOptions } from './pi-camera.types';
 
 export {
   PiCamera,

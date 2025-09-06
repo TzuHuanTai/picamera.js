@@ -1,6 +1,7 @@
 import { MqttClient } from './signaling/mqtt-client';
 import { keepOnlyCodec } from './utils/rtc-tools';
-import { IPiCamera, IPiCameraOptions, ISignalingClient } from './signaling/signaling-client';
+import { ISignalingClient } from './signaling/signaling-client';
+import { IPiCamera, IPiCameraOptions } from './pi-camera.types';
 import { CameraPropertyKey, CameraPropertyValue } from './constants/camera-property';
 import { Participant, Quality, RoomInfo, Speaking, WebSocketClient } from './signaling/websocket-client';
 import { CmdType, VideoMetadata } from './rtc/cmd-message';

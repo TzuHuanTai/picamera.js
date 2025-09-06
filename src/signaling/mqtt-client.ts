@@ -1,5 +1,6 @@
 import mqtt, { MqttClient as MqttLibClient, IClientOptions, MqttProtocol } from 'mqtt';
-import { IPiCameraOptions, ISignalingClient } from './signaling-client';
+import { ISignalingClient } from './signaling-client';
+import { IPiCameraOptions } from '../pi-camera.types';
 
 export type MqttTopicType = 'sdp' | 'ice';
 
