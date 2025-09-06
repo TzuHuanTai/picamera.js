@@ -212,8 +212,8 @@ export class PiCamera implements IPiCamera {
       this.pubPeer = new PublisherPeer(config);
       this.pubPeer.onDatachannel = (id) => this.onDatachannel?.(id);
       this.pubPeer.onIceCandidate = (ev) => {
-        if (ev.candidate?.candidate) {
-          conn.send('tricklePublisher', ev.candidate?.candidate);
+        if (ev.candidate) {
+          conn.send('tricklePublisher', JSON.stringify(ev.candidate));
         }
       }
 
@@ -222,8 +222,8 @@ export class PiCamera implements IPiCamera {
       this.subPeer.onStream = (stream) => this.onStream?.(stream);
       this.subPeer.onSfuStream = (sid, stream) => this.onSfuStream?.(sid, stream);
       this.subPeer.onIceCandidate = (ev) => {
-        if (ev.candidate?.candidate) {
-          conn.send('trickleSubscriber', ev.candidate?.candidate);
+        if (ev.candidate) {
+          conn.send('trickleSubscriber', JSON.stringify(ev.candidate));
         }
       }
 
