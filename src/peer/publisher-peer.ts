@@ -11,7 +11,7 @@ export class PublisherPeer extends RtcPeer {
   constructor(config: RtcPeerConfig) {
     super(config);
     this.pubReliableChannel = super.createDataChannel(ChannelId.Reliable, { ordered: true });
-    this.pubLossyChannel = super.createDataChannel(ChannelId.Lossy, { ordered: true, maxRetransmits: 0 });
+    this.pubLossyChannel = super.createDataChannel(ChannelId.Lossy, { ordered: false, maxRetransmits: 0 });
 
     this.pubReliableChannel.onopen = () => {
       this.onDatachannel?.(ChannelId.Reliable);
