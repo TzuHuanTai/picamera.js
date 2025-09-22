@@ -12,7 +12,7 @@ import {
 } from './signaling/websocket-client';
 import { ChannelId, IpcMode } from './peer/rtc-peer';
 
-type SignalingType = 'mqtt' | 'websocket';
+export type SignalingType = 'mqtt' | 'websocket';
 
 export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConnectionOptions {
   signaling?: SignalingType;
