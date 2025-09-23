@@ -266,7 +266,8 @@ export class RtcPeer {
   };
 
   protected onDataChannelMessage(label: ChannelLabel, event: MessageEvent): void {
-    this.dispatchPayload(label, event.data);
+    const data = new Uint8Array(event.data as ArrayBuffer);
+    this.dispatchPayload(label, data);
   }
 
   protected dispatchPayload(label: ChannelLabel, packet: Uint8Array) {
