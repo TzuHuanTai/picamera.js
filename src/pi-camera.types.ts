@@ -16,8 +16,8 @@ export type SignalingType = 'mqtt' | 'websocket';
 
 export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConnectionOptions {
   signaling?: SignalingType;
-  stunUrls?: string[];
-  turnUrl?: string;
+  stunUrls?: string | string[];
+  turnUrls?: string | string[];
   turnUsername?: string;
   turnPassword?: string;
   timeout?: number;

@@ -148,9 +148,9 @@ export class PiCamera implements IPiCamera {
       config.iceServers.push({ urls: options.stunUrls });
     }
 
-    if (options.turnUrl && options.turnUsername && options.turnPassword) {
+    if (options.turnUrls && options.turnUsername && options.turnPassword) {
       config.iceServers.push({
-        urls: options.turnUrl,
+        urls: options.turnUrls,
         username: options.turnUsername,
         credential: options.turnPassword,
       });
