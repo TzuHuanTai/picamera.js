@@ -25,11 +25,6 @@ export const LabelToChannelIdMap: Record<ChannelLabel, ChannelId> = {
 
 export type IpcMode = 'lossy' | 'reliable';
 
-export const IpcModeTable: Record<IpcMode, number> = {
-  lossy: ChannelId.Lossy,
-  reliable: ChannelId.Reliable
-};
-
 export interface RtcPeerConfig extends RTCConfiguration {
   options: IPiCameraOptions;
 }
