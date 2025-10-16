@@ -58,8 +58,6 @@ export class MqttClient implements ISignalingClient<MqttClient, MqttTopicType> {
   }
 
   private handleMessage(topic: string, message: string) {
-    console.debug(`Received message on topic :"${topic}"`,  message);
-
     switch (topic) {
       case this.getFullTopic('ice'):
         const iceCandidate: RTCIceCandidate = JSON.parse(message);
