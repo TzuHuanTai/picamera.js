@@ -20,11 +20,12 @@ export class CommanderPeer extends RtcPeer {
 
     this.cmdChannel = this.createDataChannel(ChannelId.Command);
 
-    const ipcChannelId = config.options.ipcMode === 'lossy'
-      ? ChannelId.Lossy
-      : ChannelId.Reliable;
-
-    this.ipcChannel = this.createDataChannel(ipcChannelId);
+    if (config.options.ipcMode) {
+      const ipcChannelId = config.options.ipcMode === 'lossy'
+        ? ChannelId.Lossy
+        : ChannelId.Reliable;
+      this.ipcChannel = this.createDataChannel(ipcChannelId);
+    }
 
     console.debug("CommanderPeer is created.");
   }
