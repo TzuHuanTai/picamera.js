@@ -108,7 +108,9 @@ export class CommanderPeer extends RtcPeer {
   }
 
   sendMessage = (msg: string) => {
-    const command = new CmdMessage(CmdType.CUSTOM, msg);
-    this.ipcChannel?.send(command.ToString());
+    if (this.ipcChannel?.readyState === 'open') {
+      const command = new CmdMessage(CmdType.CUSTOM, msg);
+      this.ipcChannel.send(command.ToString());
+    }
   }
 }
