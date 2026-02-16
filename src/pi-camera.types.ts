@@ -1,6 +1,4 @@
 import { CodecType } from './utils/rtc-tools';
-import { CameraPropertyKey, CameraPropertyValue } from './constants/camera-property';
-import { CmdType, VideoMetadata } from './rtc/cmd-message';
 import { IMqttConnectionOptions, MqttTopicType } from './signaling/mqtt-client';
 import {
   IWebSocketConnectionOptions,
@@ -11,13 +9,16 @@ import {
   Speaking,
 } from './signaling/websocket-client';
 import { ChannelId, IpcMode } from './peer/rtc-peer';
+import { CommandType, QueryFileResponse } from './proto/packet';
+import { CameraControlId } from './proto/camera_control';
+import { CameraControlValue } from './constants/camera-property';
 
 export type SignalingType = 'mqtt' | 'websocket';
 
 export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConnectionOptions {
   signaling?: SignalingType;
-  stunUrls?: string | string[];
-  turnUrls?: string | string[];
+  stunUrls?: string[];
+  turnUrls?: string[];
   turnUsername?: string;
   turnPassword?: string;
   timeout?: number;
@@ -51,7 +52,7 @@ export interface IPiCameraEvents {
    * @param received 
    * @param total 
    */
-  onProgress?: (received: number, total: number, type: CmdType) => void;
+  onProgress?: (received: number, total: number, type: CommandType) => void;
 
   /**
    * Attaches the remote media stream to the specified media element for playback.
@@ -69,11 +70,11 @@ export interface IPiCameraEvents {
   onSnapshot?: (base64: string) => void;
 
   /**
-   * Emitted when the metadata of a recording file is retrieved.
+   * Emitted when the video file list is retrieved.
    *
-   * @param metadata - The metadata of the recording file.
+   * @param res - The file list response.
    */
-  onMetadata?: (metadata: VideoMetadata) => void;
+  onVideoListLoaded?: (res: QueryFileResponse) => void;
 
   /**
    * Emitted when a video file is successfully downloaded from the server.
@@ -87,7 +88,7 @@ export interface IPiCameraEvents {
  * 
  * @param msg - The string message received from the remote peer.
  */
-  onMessage?: (msg: string) => void;
+  onMessage?: (data: Uint8Array) => void;
 
   /**
    * Emitted when the P2P connection cannot be established within the allotted time. 
@@ -143,7 +144,7 @@ export interface IPiCamera extends IPiCameraEvents {
   getStatus(): RTCPeerConnectionState;
 
   /**
-  * Retrieves metadata of recording files.
+  * Retrieves the list of video files.
   * - If called without arguments, returns metadata of the latest recorded file.
   * - If provided with a file path, returns metadata of up to 8 older recordings before the given file.
   * - If provided with a date, returns metadata of the closest recorded file to that time.
@@ -151,23 +152,23 @@ export interface IPiCamera extends IPiCameraEvents {
   * @param path - The path to an existing recorded file; retrieves metadata of up to 8 older recordings before it.
   * @param time - A specific date/time; retrieves metadata of the closest recorded file.
   */
-  getRecordingMetadata(): void;
-  getRecordingMetadata(path: string): void;
-  getRecordingMetadata(time: Date): void;
+  fetchVideoList(): void;
+  fetchVideoList(path: string): void;
+  fetchVideoList(time: Date): void;
 
   /**
    * Requests a video file from the server.
    * 
    * @param path - The path to the video file.
    */
-  fetchRecordedVideo(path: string): void;
+  downloadVideoFile(path: string): void;
 
-  /** 
-   * Sets the camera property, such as 3A or so.
-   * @param key Camera property type
-   * @param value Value of the camera property
+  /**
+   * Sets the camera control, such as 3A or so.
+   * @param key Camera control type
+   * @param value Value of the camera control
    */
-  setCameraProperty(key: CameraPropertyKey, value: CameraPropertyValue): void;
+  setCameraControl(key: CameraControlId, value: CameraControlValue): void;
 
   /**
    * Requests a snapshot image from the server.
@@ -181,7 +182,14 @@ export interface IPiCamera extends IPiCameraEvents {
    * 
    * @param msg - The custom contents.
    */
-  sendMessage(msg: string): void;
+  sendText(msg: string): void;
+
+  /**
+   * Send a binary data to the server for IPC.
+   * 
+   * @param msg - The custom contents.
+   */
+  sendData(msg: Uint8Array): void;
 
   /**
    * Toggles the **local** audio stream on or off. If an argument is provided, it will force the state to the specified value, otherwise, the current state will be toggled.

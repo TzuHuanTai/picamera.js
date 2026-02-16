@@ -1,7 +1,6 @@
 import { DataPacket_Kind, UserPacket, DataPacket } from '@livekit/protocol';
-import { CmdMessage, CmdType } from "../rtc/cmd-message";
-// import { stringToArrayBuffer } from "../utils/rtc-tools";
 import { ChannelId, RtcPeer, RtcPeerConfig } from "./rtc-peer";
+import { CommandType, Packet } from '../proto/packet';
 
 export class PublisherPeer extends RtcPeer {
 
@@ -23,11 +22,17 @@ export class PublisherPeer extends RtcPeer {
     console.debug("PublisherPeer created.");
   }
 
-  sendMessage = (msg: string) => {
-    const command = new CmdMessage(CmdType.CUSTOM, msg);
+  sendText = (msg: string) => {
+    this.sendData(new TextEncoder().encode(msg));
+  }
 
-    // const data = stringToArrayBuffer(command.ToString());
-    const data = new TextEncoder().encode(command.ToString());
+  sendData = (binary: Uint8Array) => {
+    const custom_command = Packet.create({
+      type: CommandType.CUSTOM,
+      customCommand: binary
+    });
+
+    const data = Packet.encode(custom_command).finish();
 
     const packet = new DataPacket({
       kind: this.options.ipcMode === 'lossy' ? DataPacket_Kind.LOSSY : DataPacket_Kind.RELIABLE,
@@ -40,7 +45,7 @@ export class PublisherPeer extends RtcPeer {
       }
     });
 
-     const encoded = new Uint8Array(packet.toBinary()).buffer;
+    const encoded = new Uint8Array(packet.toBinary());
 
     if (this.options.ipcMode === 'lossy') {
       if (this.pubLossyChannel.readyState === 'open') {

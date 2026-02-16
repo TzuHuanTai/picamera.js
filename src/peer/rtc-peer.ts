@@ -1,7 +1,7 @@
 import { IPiCameraOptions } from "../pi-camera.types";
-import { CmdType, VideoMetadata } from "../rtc/cmd-message";
+import { CommandType, Packet, QueryFileResponse } from "../proto/packet";
 import { DataChannelReceiver } from "../rtc/datachannel-receiver";
-import { arrayBufferToBase64, arrayBufferToString, utf8ArrayToString } from "../utils/rtc-tools";
+import { arrayBufferToBase64 } from "../utils/rtc-tools";
 
 export type ChannelLabel = 'command' | '_lossy' | '_reliable';
 
@@ -31,18 +31,18 @@ export interface RtcPeerConfig extends RTCConfiguration {
 
 interface ChannelReceiverGroup {
   snapshotReceiver: DataChannelReceiver;
-  metadataReceiver: DataChannelReceiver;
-  recordingReceiver: DataChannelReceiver;
+  queryFileReceiver: DataChannelReceiver;
+  fileReceiver: DataChannelReceiver;
   customReceiver: DataChannelReceiver;
 }
 
 export class RtcPeer {
   onSnapshot?: (base64: string) => void;
-  onMetadata?: (metadata: VideoMetadata) => void;
-  onProgress?: (received: number, total: number, type: CmdType) => void;
+  onVideoListLoaded?: (res: QueryFileResponse) => void;
+  onProgress?: (received: number, total: number, type: CommandType) => void;
   onVideoDownloaded?: (file: Uint8Array) => void;
   onDatachannel?: (id: ChannelId) => void;
-  onMessage?: (msg: string) => void;
+  onMessage?: (data: Uint8Array) => void;
   onStream?: (stream: MediaStream) => void;
   onSfuStream?: (sid: string, stream: MediaStream) => void;
   onIceCandidate?: ((ev: RTCPeerConnectionIceEvent) => any);
@@ -103,8 +103,8 @@ export class RtcPeer {
     for (const label in this.channelReceivers) {
       const group = this.channelReceivers[label as ChannelLabel];
       group.snapshotReceiver.reset();
-      group.metadataReceiver.reset();
-      group.recordingReceiver.reset();
+      group.queryFileReceiver.reset();
+      group.fileReceiver.reset();
       group.customReceiver.reset();
     }
     this.channelReceivers = {} as Record<ChannelLabel, ChannelReceiverGroup>;
@@ -136,7 +136,7 @@ export class RtcPeer {
     this.peer.onconnectionstatechange = null;
 
     this.onSnapshot = undefined;
-    this.onMetadata = undefined;
+    this.onVideoListLoaded = undefined;
     this.onProgress = undefined;
     this.onVideoDownloaded = undefined;
     this.onMessage = undefined;
@@ -242,20 +242,23 @@ export class RtcPeer {
 
     this.channelReceivers[label] = {
       snapshotReceiver: new DataChannelReceiver({
-        onProgress: (received, total) => this.onProgress?.(received, total, CmdType.SNAPSHOT),
+        onProgress: (received, total) => this.onProgress?.(received, total, CommandType.TAKE_SNAPSHOT),
         onComplete: (body) => this.onSnapshot?.("data:image/jpeg;base64," + arrayBufferToBase64(body))
       }),
-      metadataReceiver: new DataChannelReceiver({
-        onProgress: (received, total) => this.onProgress?.(received, total, CmdType.METADATA),
-        onComplete: (body) => this.onMetadata?.(JSON.parse(arrayBufferToString(body)) as VideoMetadata)
+      queryFileReceiver: new DataChannelReceiver({
+        onProgress: (received, total) => this.onProgress?.(received, total, CommandType.QUERY_FILE),
+        onComplete: (body) => {
+          const decoded = QueryFileResponse.decode(body);
+          this.onVideoListLoaded?.(decoded);
+        }
       }),
-      recordingReceiver: new DataChannelReceiver({
-        onProgress: (received, total) => this.onProgress?.(received, total, CmdType.RECORDING),
+      fileReceiver: new DataChannelReceiver({
+        onProgress: (received, total) => this.onProgress?.(received, total, CommandType.TRANSFER_FILE),
         onComplete: (body) => this.onVideoDownloaded?.(body)
       }),
       customReceiver: new DataChannelReceiver({
-        onProgress: (received, total) => this.onProgress?.(received, total, CmdType.CUSTOM),
-        onComplete: (body) => this.onMessage?.(utf8ArrayToString(body))
+        onProgress: (received, total) => this.onProgress?.(received, total, CommandType.CUSTOM),
+        onComplete: (body) => this.onMessage?.(body)
       }),
     };
   };
@@ -265,28 +268,27 @@ export class RtcPeer {
     this.dispatchPayload(label, data);
   }
 
-  protected dispatchPayload(label: ChannelLabel, packet: Uint8Array) {
+  protected dispatchPayload(label: ChannelLabel, data: Uint8Array) {
+    const packet = Packet.decode(data);
+
     const receivers = this.channelReceivers[label];
     if (!receivers) {
       console.warn(`No receivers found for label: ${label}`);
       return;
     }
 
-    const header = packet[0] as CmdType;
-    const body = packet.slice(1);
-
-    switch (header) {
-      case CmdType.SNAPSHOT:
-        receivers.snapshotReceiver.receiveData(body);
+    switch (packet.type) {
+      case CommandType.TAKE_SNAPSHOT:
+        receivers.snapshotReceiver.receiveData(packet);
         break;
-      case CmdType.METADATA:
-        receivers.metadataReceiver.receiveData(body);
+      case CommandType.QUERY_FILE:
+        receivers.queryFileReceiver.receiveData(packet);
         break;
-      case CmdType.RECORDING:
-        receivers.recordingReceiver.receiveData(body);
+      case CommandType.TRANSFER_FILE:
+        receivers.fileReceiver.receiveData(packet);
         break;
-      case CmdType.CUSTOM:
-        receivers.customReceiver.receiveData(body);
+      case CommandType.CUSTOM:
+        receivers.customReceiver.receiveData(packet);
         break;
     }
   }

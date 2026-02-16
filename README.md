@@ -5,7 +5,7 @@
     PiCamera.js
 </h1>
 
-JavaScript client for [pi-webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC) — stream low-latency video/audio from Raspberry Pi using native WebRTC with hardware H.264 (V4L2) or OpenH264.
+JavaScript client for [pi-webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC) — stream low-latency video/audio from Raspberry Pi using native WebRTC with hardware H264 encoding.
 
 Supports P2P, SFU, DataChannel control, and snapshot/file transfer over WebRTC.
 
@@ -117,14 +117,14 @@ These examples show how to use individual features separately.
   });
 
   conn.onDatachannel = (id) => {
-    // on connected to remote datachannel
+    // send data to the ipc listener in pi-webrtc
     if (id === ChannelId.Reliable)
-      conn.sendMessage('Hello Reliable Channel!');
+      conn.sendText('Hello! this is picamera.js!');
   }
 
-  conn.onMessage = (msg) => {
-    // get a response msg here.
-    conn.terminate();
+  conn.onMessage = (data) => {
+    // get IPC response msg here.
+    const text = new TextDecoder('utf-8').decode(data);
   }
 
   conn.connect();
@@ -146,15 +146,15 @@ These examples show how to use individual features separately.
 
   conn.onDatachannel = () => {
     // connected to remote datachannel and request the latest file.
-    conn.getRecordingMetadata();
+    conn.fetchVideoList();
   }
 
-  conn.onMetadata = (metadata) => {
+  conn.onVideoListLoaded = (res) => {
     // retrieved the file's metadata and request download the target.
-    conn.fetchRecordedVideo(metadata.path);
+    conn.downloadVideoFile(res.files[0].filepath);
   }
 
-  conn.onProgress = (recv, total) => {
+  conn.onProgress = (recv, total, type) => {
     // show up downloading progress of the datachannel.
   }
 
@@ -200,12 +200,12 @@ These examples show how to use individual features separately.
 
   // click the button with onclick="setAwb()" when it's connected
   setAwb = () => {
-    conn.setCameraProperty(CameraPropertyKey.AWB_MODE, AwbModeEnum.AwbCloudy);
+    conn.setCameraControl(CameraControlId.AWB_MODE, AwbModeEnum.AWB_CLOUDY);
   }
 
   // click the button with onclick="setAf()" when it's connected
   setAf = () => {
-    conn.setCameraProperty(CameraPropertyKey.AF_MODE, AfModeEnum.AfModeContinuous);
+    conn.setCameraControl(CameraControlId.AF_MODE, AfModeEnum.AF_MODE_CONTINUOUS);
   }
   ```
 
@@ -344,7 +344,7 @@ Most browsers require https for video to work. When using self-signed certificat
   * [onStream](#onstream)
   * [onSfuStream](#onsfustream)
   * [onSnapshot](#onSnapshot)
-  * [onMetadata](#onmetadata)
+  * [onVideoListLoaded](#onVideoListLoaded)
   * [onVideoDownloaded](#onvideodownloaded)
   * [onMessage](#onmessage)
   * [onTimeout](#onTimeout)
@@ -356,11 +356,12 @@ Most browsers require https for video to work. When using self-signed certificat
   * [connect](#connect)
   * [terminate](#terminate)
   * [getStatus](#getStatus)
-  * [getRecordingMetadata](#getrecordingmetadata)
-  * [fetchRecordedVideo](#fetchrecordedvideo)
-  * [setCameraProperty](#setcameraproperty)
+  * [fetchVideoList](#fetchVideoList)
+  * [downloadVideoFile](#downloadVideoFile)
+  * [setCameraControl](#setCameraControl)
   * [snapshot](#snapshot)
-  * [sendMessage](#sendmessage)
+  * [sendText](#sendText)
+  * [sendData](#sendData)
   * [toggleMic](#toggleMic)
   * [toggleSpeaker](#toggleSpeaker)
 
@@ -383,12 +384,12 @@ Available flags for initialization.
 | userId          | `string`   | `(random uuid)` | The user identifier displayed in the room after joining the SFU server. |
 | roomId          | `string`   |         | The room ID used to join a session on the SFU server.        |
 | stunUrls        | `string[]` |         | An array of STUN server URLs for WebRTC. Leave out or set to null for local network or VPN IP addresses. |
-| turnUrl         | `string`   |         | The TURN server URL for WebRTC.                              |
+| turnUrls        | `string[]` |         | The TURN server URL for WebRTC.                              |
 | turnUsername    | `string`   |         | The username for the TURN server.                            |
 | turnPassword    | `string`   |         | The password for the TURN server.                            |
 | timeout         | `number`   | `10000` | The connection timeout in milliseconds (`ms`).               |
 | datachannelOnly | `boolean`  | `false` | Specifies that the connection is only for data transfer, without media streams. |
-| ipcMode         | `string`  |          | Defines the communication mode for `sendMessage()` in IPC (inter-process communication). Accepts `lossy` (UDP-like) or `reliable` (TCP-like) modes. |
+| ipcMode         | `string`  |          | Defines the communication mode for the IPC data channel. Accepts `lossy` (UDP-like) or `reliable` (TCP-like) modes. |
 | isMicOn         | `boolean`  | `true`  | Enables the local microphone stream by default if the connection is established. |
 | isSpeakerOn     | `boolean`  | `true`  | Enables the remote audio stream by default if the connection is established. |
 | credits         | `boolean`  | `true`  | Show watermark to run it under credits.                      |
@@ -409,7 +410,7 @@ Available flags for initialization.
 
 - ### onProgress
 
-  `= (received: number, total: number, type: CmdType) => {}`
+  `= (received: number, total: number, type: CommandType) => {}`
 
   If any data transfer by datachannel, the on progress will give the received/total info.
 
@@ -431,7 +432,7 @@ Available flags for initialization.
 
   Emitted after calling the `snapshot()` method. This event emits a base64-encoded image once all image packets are received from the server.
 
-- ### onMetadata
+- ### onVideoListLoaded
 
   `= (metadata: VideoMetadata) => {}`
 
@@ -451,9 +452,9 @@ Available flags for initialization.
 
 - ### onMessage
 
-  `= (msg: string) => {}`
+  `= (msg: Uint8Array) => {}`
 
-  Read IPC message from server.
+  Emitted when get IPC message from the server.
 
 - ### onRoomInfo
 
@@ -499,13 +500,13 @@ Available flags for initialization.
   
   Retrieves the current connection status.
 
-- ### getRecordingMetadata
+- ### fetchVideoList
 
-  `.getRecordingMetadata()`
+  `.fetchVideoList()`
 
-  `.getRecordingMetadata(path: string)`
+  `.fetchVideoList(path: string)`
 
-  `.getRecordingMetadata(time: Date)`
+  `.fetchVideoList(time: Date)`
 
   Retrieves metadata of recording files.
 
@@ -518,17 +519,17 @@ Available flags for initialization.
   - path - The path to an existing recorded file; retrieves metadata of up to 8 older recordings before it.
   - time - A specific date/time; retrieves metadata of the closest recorded file.
 
-- ### fetchRecordedVideo
+- ### downloadVideoFile
 
-  `.fetchRecordedVideo(path: string)` 
+  `.downloadVideoFile(path: string)` 
   
   Requests a video file from the server.
 
   - `path` - The path to the video file.
 
-- ### setCameraProperty
+- ### setCameraControl
 
-  `.setCameraProperty(key: CameraPropertyKey, value: CameraPropertyValue)` 
+  `.setCameraControl(key: CameraControlId, value: CameraControlValue)`
   
   Sets camera properties, such as 3A or so.
 
@@ -540,11 +541,17 @@ Available flags for initialization.
 
   - `quality` - The range from `0` to `100`, determines the image quality. The default value is `30`.
 
-- ### sendMessage
+- ### sendText
 
   `.(msg: string)`
   
   If `ipcMode` is set to `reliable`, the message will be retransmitted until successfully delivered. If set to `lossy`, the message may be lost, but with lower latency.
+
+- ### sendData
+
+  `.(binary: Uint8Array)`
+  
+  Same as `sendText`, but sends in binary format.
 
 - ### toggleMic
 
