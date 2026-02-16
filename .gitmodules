@@ -1,0 +1,3 @@
+[submodule "external/protocol"]
+	path = external/protocol
+	url = https://github.com/TzuHuanTai/protocol.git

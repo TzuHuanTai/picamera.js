@@ -2,14 +2,15 @@ import { MqttClient } from './signaling/mqtt-client';
 import { keepOnlyCodec } from './utils/rtc-tools';
 import { ISignalingClient } from './signaling/signaling-client';
 import { IPiCamera, IPiCameraOptions } from './pi-camera.types';
-import { CameraPropertyKey, CameraPropertyValue } from './constants/camera-property';
 import { Participant, Quality, RoomInfo, Speaking, WebSocketClient } from './signaling/websocket-client';
-import { CmdType, VideoMetadata } from './rtc/cmd-message';
 import { ChannelId, RtcPeerConfig } from './peer/rtc-peer';
 import { CommanderPeer } from './peer/commander-peer';
 import { SubscriberPeer } from './peer/subscriber-peer';
 import { PublisherPeer } from './peer/publisher-peer';
 import { DEFAULT } from './constants';
+import { CommandType, QueryFileResponse } from './proto/packet';
+import { CameraControlId } from './proto/camera_control';
+import { CameraControlValue } from './constants/camera-property';
 
 export class PiCamera implements IPiCamera {
   onConnectionState?: (state: RTCPeerConnectionState) => void;
@@ -17,10 +18,10 @@ export class PiCamera implements IPiCamera {
   onSnapshot?: (base64: string) => void;
   onStream?: (stream: MediaStream) => void;
   onSfuStream?: (sid: string, stream: MediaStream) => void;
-  onMetadata?: (metadata: VideoMetadata) => void;
-  onProgress?: (received: number, total: number, type: CmdType) => void;
+  onVideoListLoaded?: (res: QueryFileResponse) => void;
+  onProgress?: (received: number, total: number, type: CommandType) => void;
   onVideoDownloaded?: (file: Uint8Array) => void;
-  onMessage?: (msg: string) => void;
+  onMessage?: (data: Uint8Array) => void;
   onTimeout?: () => void;
 
   onRoomInfo?: (room: RoomInfo) => void;
@@ -88,29 +89,34 @@ export class PiCamera implements IPiCamera {
     return this.cmdPeer.connectionState;
   }
 
-  getRecordingMetadata(param?: string | Date): void {
-    if (this.onMetadata) {
-      this.cmdPeer?.getRecordingMetadata(param);
+  fetchVideoList(param?: string | Date): void {
+    if (this.onVideoListLoaded) {
+      this.cmdPeer?.fetchVideoList(param);
     }
   }
 
-  fetchRecordedVideo(path: string): void {
+  downloadVideoFile(path: string): void {
     if (this.onVideoDownloaded) {
-      this.cmdPeer?.fetchRecordedVideo(path);
+      this.cmdPeer?.downloadVideoFile(path);
     }
   }
 
-  setCameraProperty = (key: CameraPropertyKey, value: CameraPropertyValue) => {
-    this.cmdPeer?.setCameraProperty(key, value);
+  setCameraControl = (key: CameraControlId, value: CameraControlValue) => {
+    this.cmdPeer?.setCameraControl(key, value);
   }
 
   snapshot = (quality: number = 30) => {
     this.cmdPeer?.snapshot(quality);
   }
 
-  sendMessage = (msg: string) => {
-    this.cmdPeer?.sendMessage(msg);
-    this.pubPeer?.sendMessage(msg);
+  sendText = (msg: string) => {
+    this.cmdPeer?.sendText(msg);
+    this.pubPeer?.sendText(msg);
+  }
+
+  sendData = (data: Uint8Array) => {
+    this.cmdPeer?.sendData(data);
+    this.pubPeer?.sendData(data);
   }
 
   toggleMic = (enabled: boolean = !this.options.isMicOn) => {
@@ -177,11 +183,11 @@ export class PiCamera implements IPiCamera {
     };
 
     this.cmdPeer.onSnapshot = (base64) => this.onSnapshot?.(base64);
-    this.cmdPeer.onMetadata = (metadata) => this.onMetadata?.(metadata);
+    this.cmdPeer.onVideoListLoaded = (res) => this.onVideoListLoaded?.(res);
     this.cmdPeer.onProgress = (received, total, type) => this.onProgress?.(received, total, type);
     this.cmdPeer.onVideoDownloaded = (file) => this.onVideoDownloaded?.(file);
     this.cmdPeer.onDatachannel = (id) => this.onDatachannel?.(id);
-    this.cmdPeer.onMessage = (msg) => this.onMessage?.(msg);
+    this.cmdPeer.onMessage = (data) => this.onMessage?.(data);
 
     conn.onIceCandidate = (ice) => this.cmdPeer?.addIceCandidate(ice);
     conn.onAnswer = (sdp) => this.cmdPeer?.setRemoteDescription(sdp);
@@ -219,7 +225,7 @@ export class PiCamera implements IPiCamera {
       }
 
       this.subPeer = new SubscriberPeer(config);
-      this.subPeer.onMessage = (msg) => this.onMessage?.(msg);
+      this.subPeer.onMessage = (data) => this.onMessage?.(data);
       this.subPeer.onStream = (stream) => this.onStream?.(stream);
       this.subPeer.onSfuStream = (sid, stream) => this.onSfuStream?.(sid, stream);
       this.subPeer.onIceCandidate = (ev) => {

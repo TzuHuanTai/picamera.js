@@ -1,6 +1,13 @@
-import { CameraPropertyKey, CameraPropertyValue } from "../constants/camera-property";
+import {
+  CommandType,
+  DisconnectRequest,
+  Packet,
+  QueryFileRequest,
+  QueryFileType
+} from "../proto/packet";
+import { CameraControlId } from "../proto/camera_control";
+import { CameraControlValue } from "../constants/camera-property";
 import { padZero } from "../utils/rtc-tools";
-import { CameraCtrlMessage, CmdMessage, CmdType, MetaCmdMessage, MetadataCmd, VideoMetadata } from "../rtc/cmd-message";
 import { ChannelId, ChannelLabelMap, RtcPeer, RtcPeerConfig } from "./rtc-peer";
 
 export class CommanderPeer extends RtcPeer {
@@ -32,8 +39,13 @@ export class CommanderPeer extends RtcPeer {
 
   close = () => {
     if (this.cmdChannel.readyState === 'open') {
-      const command = new CmdMessage(CmdType.CONNECT, "false");
-      this.cmdChannel.send(command.ToString());
+      const packet = Packet.create({
+        type: CommandType.DISCONNECT,
+        disconnectionRequest: DisconnectRequest.create()
+      });
+      const binary = Packet.encode(packet).finish();
+
+      this.cmdChannel.send(binary);
     }
     this.cmdChannel.close();
     this.ipcChannel?.close();
@@ -65,52 +77,84 @@ export class CommanderPeer extends RtcPeer {
     return dataChannel;
   }
 
-  getRecordingMetadata = (param?: string | Date) => {
-    if (this.cmdChannel.readyState === 'open' && this.onMetadata) {
-      let metaCmd: MetaCmdMessage;
+  fetchVideoList = (param?: string | Date) => {
+    if (this.cmdChannel.readyState === 'open' && this.onVideoListLoaded) {
+      let queryRequest = QueryFileRequest.create();
 
       if (param === undefined) {
-        metaCmd = new MetaCmdMessage(MetadataCmd.LATEST, "");
+        queryRequest.type = QueryFileType.LATEST_FILE;
       } else if (typeof param === "string") {
-        metaCmd = new MetaCmdMessage(MetadataCmd.OLDER, param);
+        queryRequest.type = QueryFileType.BEFORE_FILE;
+        queryRequest.parameter = param;
       } else {
         const formattedDate = `${param.getFullYear()}${padZero(param.getMonth() + 1)}${padZero(param.getDate())}` +
           "_" + `${padZero(param.getHours())}${padZero(param.getMinutes())}${padZero(param.getSeconds())}`;
-        metaCmd = new MetaCmdMessage(MetadataCmd.SPECIFIC_TIME, formattedDate);
+        queryRequest.type = QueryFileType.BEFORE_TIME;
+        queryRequest.parameter = formattedDate;
       }
 
-      const command = new CmdMessage(CmdType.METADATA, metaCmd.ToString());
-      this.cmdChannel.send(command.ToString());
+      const binary = Packet.encode(Packet.create({
+        type: CommandType.QUERY_FILE,
+        queryFileRequest: queryRequest
+      })).finish();
+      this.cmdChannel.send(binary);
     }
   }
 
-  fetchRecordedVideo = (path: string) => {
+  downloadVideoFile = (path: string) => {
     if (this.onVideoDownloaded && this.cmdChannel.readyState === 'open') {
-      const command = new CmdMessage(CmdType.RECORDING, path);
-      this.cmdChannel.send(command.ToString());
+      const command = Packet.create({
+        type: CommandType.TRANSFER_FILE,
+        transferFileRequest: {
+          filepath: path
+        }
+      });
+      const binary = Packet.encode(command).finish();
+      this.cmdChannel.send(binary);
     }
   }
 
-  setCameraProperty = (key: CameraPropertyKey, value: CameraPropertyValue) => {
+  setCameraControl = (key: CameraControlId, value: CameraControlValue) => {
     if (this.cmdChannel.readyState === 'open') {
-      const ctl = new CameraCtrlMessage(key, value);
-      const command = new CmdMessage(CmdType.CAMERA_CONTROL, JSON.stringify(ctl));
-      this.cmdChannel.send(command.ToString());
+      const command = Packet.create({
+        type: CommandType.CONTROL_CAMERA,
+        controlCameraRequest: {
+          id: key,
+          value: value,
+        }
+      });
+      const binary = Packet.encode(command).finish();
+      this.cmdChannel.send(binary);
     }
   }
 
   snapshot = (quality: number = 30) => {
     if (this.onSnapshot && this.cmdChannel.readyState === 'open') {
       quality = Math.max(0, Math.min(quality, 100));
-      const command = new CmdMessage(CmdType.SNAPSHOT, String(quality));
-      this.cmdChannel.send(command.ToString());
+      const command = Packet.create({
+        type: CommandType.TAKE_SNAPSHOT,
+        takeSnapshotRequest: { quality: quality }
+      });
+      const binary = Packet.encode(command).finish();
+
+      this.cmdChannel.send(binary);
     }
   }
 
-  sendMessage = (msg: string) => {
+  sendText = (msg: string) => {
+    this.sendData(new TextEncoder().encode(msg));
+  }
+
+  sendData = (binary: Uint8Array) => {
     if (this.ipcChannel?.readyState === 'open') {
-      const command = new CmdMessage(CmdType.CUSTOM, msg);
-      this.ipcChannel.send(command.ToString());
+      const custom_command = Packet.create({
+        type: CommandType.CUSTOM,
+        customCommand: binary
+      });
+
+      const data = Packet.encode(custom_command).finish();
+
+      this.ipcChannel.send(data);
     }
   }
 }
