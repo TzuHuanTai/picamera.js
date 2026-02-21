@@ -17,12 +17,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract tag version
         id: extract_version
@@ -40,6 +48,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Generate Proto files
+        run: npm run proto:build
 
       - name: Build the package
         run: npm run build
