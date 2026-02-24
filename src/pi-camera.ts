@@ -8,7 +8,7 @@ import { CommanderPeer } from './peer/commander-peer';
 import { SubscriberPeer } from './peer/subscriber-peer';
 import { PublisherPeer } from './peer/publisher-peer';
 import { DEFAULT } from './constants';
-import { CommandType, QueryFileResponse } from './proto/packet';
+import { CommandType, QueryFileResponse, RecordingResponse } from './proto/packet';
 import { CameraControlId } from './proto/camera_control';
 import { CameraControlValue } from './constants/camera-property';
 
@@ -22,6 +22,7 @@ export class PiCamera implements IPiCamera {
   onProgress?: (received: number, total: number, type: CommandType) => void;
   onVideoDownloaded?: (file: Uint8Array) => void;
   onMessage?: (data: Uint8Array) => void;
+  onRecording?: (res: RecordingResponse) => void;
   onTimeout?: () => void;
 
   onRoomInfo?: (room: RoomInfo) => void;
@@ -119,6 +120,14 @@ export class PiCamera implements IPiCamera {
     this.pubPeer?.sendData(data);
   }
 
+  startRecording = () => {
+    this.cmdPeer?.startRecording();
+  }
+
+  stopRecording = () => {
+    this.cmdPeer?.stopRecording();
+  }
+
   toggleMic = (enabled: boolean = !this.options.isMicOn) => {
     this.cmdPeer?.toggleMic(enabled);
     this.pubPeer?.toggleMic(enabled);
@@ -188,6 +197,7 @@ export class PiCamera implements IPiCamera {
     this.cmdPeer.onVideoDownloaded = (file) => this.onVideoDownloaded?.(file);
     this.cmdPeer.onDatachannel = (id) => this.onDatachannel?.(id);
     this.cmdPeer.onMessage = (data) => this.onMessage?.(data);
+    this.cmdPeer.onRecording = (res) => this.onRecording?.(res);
 
     conn.onIceCandidate = (ice) => this.cmdPeer?.addIceCandidate(ice);
     conn.onAnswer = (sdp) => this.cmdPeer?.setRemoteDescription(sdp);

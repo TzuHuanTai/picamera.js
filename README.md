@@ -27,6 +27,7 @@ You can also view the demo source code here: [index.html](demo/index.html).
 - [Send message for IPC via DataChannel](#send-message-for-ipc-via-datachannel)
 - [Download the latest video record](#download-the-latest-video-record)
 - [Set camera properties while streaming](#set-camera-properties-while-streaming)
+- [Start and stop recording](#start-and-stop-recording)
 - [Watch videos via the SFU server](#watch-videos-via-the-sfu-server)
 
 ### Notes:
@@ -209,6 +210,37 @@ These examples show how to use individual features separately.
   }
   ```
 
+- ### Start and stop recording
+
+  Use the command datachannel to remotely start or stop video recording on the Raspberry Pi. The server responds via `onRecording` with the current recording state.
+
+  ```javascript
+  let conn = new PiCamera({
+    deviceUid: 'your-custom-uid',
+    mqttHost: 'your.mqtt.cloud',
+    mqttPath: '/mqtt',
+    mqttPort: '8884',
+    mqttUsername: 'hakunamatata',
+    mqttPassword: 'Wonderful',
+    stunUrls: ["stun:stun1.l.google.com:19302"],
+    datachannelOnly: true,
+  });
+
+  conn.onDatachannel = (id) => {
+    if (id === ChannelId.Command) {
+      conn.startRecording();
+      setTimeout(() => conn.stopRecording(), 3000);
+    }
+  };
+
+  conn.onRecording = (res) => {
+    console.log('isRecording:', res.isRecording);
+    console.log('filepath:', res.filepath);
+  };
+
+  conn.connect();
+  ```
+
 - ### Watch videos via the SFU server
 
   This example demonstrates how to watch a live stream through an SFU server.
@@ -347,6 +379,7 @@ Most browsers require https for video to work. When using self-signed certificat
   * [onVideoListLoaded](#onVideoListLoaded)
   * [onVideoDownloaded](#onvideodownloaded)
   * [onMessage](#onmessage)
+  * [onRecording](#onrecording)
   * [onTimeout](#onTimeout)
   * [onRoomInfo](#onroominfo)
   * [onQuility](#onquility)
@@ -360,6 +393,8 @@ Most browsers require https for video to work. When using self-signed certificat
   * [downloadVideoFile](#downloadVideoFile)
   * [setCameraControl](#setCameraControl)
   * [snapshot](#snapshot)
+  * [startRecording](#startrecording)
+  * [stopRecording](#stoprecording)
   * [sendText](#sendText)
   * [sendData](#sendData)
   * [toggleMic](#toggleMic)
@@ -456,6 +491,15 @@ Available flags for initialization.
 
   Emitted when get IPC message from the server.
 
+- ### onRecording
+
+  `= (res: RecordingResponse) => {}`
+
+  Emitted when the server responds to a `startRecording()` or `stopRecording()` command.
+
+  - `res.isRecording` — `true` if recording has started, `false` if it has stopped.
+  - `res.filepath` — The active recording file path.
+
 - ### onRoomInfo
 
   `= (participant: RoomInfo) => {}`
@@ -540,6 +584,18 @@ Available flags for initialization.
    Requests a snapshot image from the server.
 
   - `quality` - The range from `0` to `100`, determines the image quality. The default value is `30`.
+
+- ### startRecording
+
+  `.startRecording()`
+
+  Sends a `START_RECORDING` command to the server via the command datachannel. The server's response is delivered via `onRecording`.
+
+- ### stopRecording
+
+  `.stopRecording()`
+
+  Sends a `STOP_RECORDING` command to the server via the command datachannel. The server's response is delivered via `onRecording`.
 
 - ### sendText
 
