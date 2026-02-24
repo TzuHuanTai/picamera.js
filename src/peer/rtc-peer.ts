@@ -1,5 +1,5 @@
 import { IPiCameraOptions } from "../pi-camera.types";
-import { CommandType, Packet, QueryFileResponse } from "../proto/packet";
+import { CommandType, Packet, QueryFileResponse, RecordingResponse } from "../proto/packet";
 import { DataChannelReceiver } from "../rtc/datachannel-receiver";
 import { arrayBufferToBase64 } from "../utils/rtc-tools";
 
@@ -43,6 +43,7 @@ export class RtcPeer {
   onVideoDownloaded?: (file: Uint8Array) => void;
   onDatachannel?: (id: ChannelId) => void;
   onMessage?: (data: Uint8Array) => void;
+  onRecording?: (res: RecordingResponse) => void;
   onStream?: (stream: MediaStream) => void;
   onSfuStream?: (sid: string, stream: MediaStream) => void;
   onIceCandidate?: ((ev: RTCPeerConnectionIceEvent) => any);
@@ -140,6 +141,7 @@ export class RtcPeer {
     this.onProgress = undefined;
     this.onVideoDownloaded = undefined;
     this.onMessage = undefined;
+    this.onRecording = undefined;
     this.onStream = undefined;
     this.onIceCandidate = undefined;
     this.onConnectionStateChange = undefined;
@@ -289,6 +291,12 @@ export class RtcPeer {
         break;
       case CommandType.CUSTOM:
         receivers.customReceiver.receiveData(packet);
+        break;
+      case CommandType.START_RECORDING:
+      case CommandType.STOP_RECORDING:
+        if (packet.recordingResponse) {
+          this.onRecording?.(packet.recordingResponse);
+        }
         break;
     }
   }

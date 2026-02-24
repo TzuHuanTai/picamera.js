@@ -9,7 +9,7 @@ import {
   Speaking,
 } from './signaling/websocket-client';
 import { ChannelId, IpcMode } from './peer/rtc-peer';
-import { CommandType, QueryFileResponse } from './proto/packet';
+import { CommandType, QueryFileResponse, RecordingResponse } from './proto/packet';
 import { CameraControlId } from './proto/camera_control';
 import { CameraControlValue } from './constants/camera-property';
 
@@ -84,11 +84,19 @@ export interface IPiCameraEvents {
   onVideoDownloaded?: (file: Uint8Array) => void;
 
   /**
- * Emitted when a IPC message is received.
- * 
- * @param msg - The string message received from the remote peer.
- */
+   * Emitted when a IPC message is received.
+   *
+   * @param data - The binary message received from the remote peer.
+   */
   onMessage?: (data: Uint8Array) => void;
+
+  /**
+   * Emitted when the server responds to a `startRecording()` or `stopRecording()` command.
+   *
+   * @param res - `isRecording` indicates the current recording state; `filepath` is the
+   *              active recording file path (empty string when recording is stopped).
+   */
+  onRecording?: (res: RecordingResponse) => void;
 
   /**
    * Emitted when the P2P connection cannot be established within the allotted time. 
@@ -190,6 +198,18 @@ export interface IPiCamera extends IPiCameraEvents {
    * @param msg - The custom contents.
    */
   sendData(msg: Uint8Array): void;
+
+  /**
+   * Sends a `START_RECORDING` command to the server.
+   * The server's response will be delivered via `onRecording`.
+   */
+  startRecording(): void;
+
+  /**
+   * Sends a `STOP_RECORDING` command to the server.
+   * The server's response will be delivered via `onRecording`.
+   */
+  stopRecording(): void;
 
   /**
    * Toggles the **local** audio stream on or off. If an argument is provided, it will force the state to the specified value, otherwise, the current state will be toggled.

@@ -157,4 +157,20 @@ export class CommanderPeer extends RtcPeer {
       this.ipcChannel.send(data);
     }
   }
+
+  startRecording = () => {
+    if (this.cmdChannel.readyState === 'open') {
+      const command = Packet.create({ type: CommandType.START_RECORDING });
+      const binary = Packet.encode(command).finish();
+      this.cmdChannel.send(binary);
+    }
+  }
+
+  stopRecording = () => {
+    if (this.cmdChannel.readyState === 'open') {
+      const command = Packet.create({ type: CommandType.STOP_RECORDING });
+      const binary = Packet.encode(command).finish();
+      this.cmdChannel.send(binary);
+    }
+  }
 }
