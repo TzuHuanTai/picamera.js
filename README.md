@@ -5,6 +5,11 @@
     PiCamera.js
 </h1>
 
+<p align="center">
+    <a href="https://www.npmjs.com/package/picamera.js"><img src="https://img.shields.io/npm/dt/picamera.js.svg?color=yellow" alt="npm downloads"></a>
+    <img src="https://img.shields.io/github/v/tag/TzuHuanTai/picamera.js?filter=v*&label=release&color=blue" alt="Release">
+</p>
+
 JavaScript client for [pi-webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC) — stream low-latency video/audio from Raspberry Pi using native WebRTC with hardware H264 encoding.
 
 Supports P2P, SFU, DataChannel control, and snapshot/file transfer over WebRTC.
