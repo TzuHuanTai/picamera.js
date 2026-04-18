@@ -13,6 +13,15 @@ import { CommandType, QueryFileResponse, RecordingResponse } from './proto/packe
 import { CameraControlId } from './proto/camera_control';
 import { CameraControlValue } from './constants/camera-property';
 
+/**
+ * MediaStream extended with toURL() for React Native (react-native-webrtc).
+ * When using picamera.js in React Native, call registerGlobals() from
+ * react-native-webrtc at app startup to inject this method at runtime.
+ */
+export interface RNMediaStream extends MediaStream {
+  toURL(): string;
+}
+
 export type SignalingType = 'mqtt' | 'websocket';
 
 export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConnectionOptions {
@@ -26,7 +35,6 @@ export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConn
   ipcMode?: IpcMode;
   isMicOn?: boolean;
   isSpeakerOn?: boolean;
-  credits?: boolean;
   codec?: CodecType;
 }
 
@@ -60,6 +68,15 @@ export interface IPiCameraEvents {
    * @param stream - The HTML video element where the remote media stream will be rendered.
    */
   onStream?: (stream: MediaStream) => void;
+
+  /**
+   * Triggered only when a media stream is received from the SFU, delivering
+   * both the participant's server-side ID (sid) and the associated MediaStream.
+   *
+   * @param sid - Server-side participant ID.
+   * @param stream - The remote media stream.
+   */
+  onSfuStream?: (sid: string, stream: MediaStream) => void;
 
   /**
    * Emitted after calling the `snapshot()` method. This event emits a base64-encoded image 
