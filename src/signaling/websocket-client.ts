@@ -1,4 +1,4 @@
-import { ISignalingClient } from './signaling-client';
+import { ISignalingClient, generateUUID } from './signaling-client';
 
 export interface IWebSocketConnectionOptions {
   websocketUrl?: string;
@@ -84,7 +84,7 @@ export class WebSocketClient implements ISignalingClient<WebSocketClient, Websoc
   constructor(options: IWebSocketConnectionOptions) {
     this.url = options.websocketUrl;
     this.apiKey = options.apiKey ?? '';
-    this.userId = options.userId ?? crypto.randomUUID();
+    this.userId = options.userId ?? generateUUID();
     this.roomId = options.roomId ?? '';
   }
 

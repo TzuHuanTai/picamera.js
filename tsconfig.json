@@ -4,6 +4,7 @@
     "module": "CommonJS",
     "declaration": true,
     "removeComments": false,
+    "rootDir": "./src",
     "outDir": "./build",
     "strict": true
   },

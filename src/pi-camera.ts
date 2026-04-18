@@ -144,12 +144,11 @@ export class PiCamera implements IPiCamera {
     const defaultOptions = {
       signaling: 'mqtt',
       mqttProtocol: 'wss',
-      mqttPath: '',
+      mqttPath: '/mqtt',
       timeout: DEFAULT.SIGNALING_TIMEOUT,
       datachannelOnly: false,
       isMicOn: true,
       isSpeakerOn: true,
-      credits: true,
     } as IPiCameraOptions;
 
     return { ...defaultOptions, ...userOptions };
@@ -185,7 +184,8 @@ export class PiCamera implements IPiCamera {
     this.cmdPeer.onConnectionStateChange = (state) => {
       this.onConnectionState?.(state);
       if (state === "connected" && this.client?.isConnected()) {
-        this.client.disconnect();
+        // Sometime need to wait renegotiation after connection established.
+        // this.client.disconnect();
       } else if (state === "failed") {
         this.terminate();
       }
@@ -201,6 +201,12 @@ export class PiCamera implements IPiCamera {
 
     conn.onIceCandidate = (ice) => this.cmdPeer?.addIceCandidate(ice);
     conn.onAnswer = (sdp) => this.cmdPeer?.setRemoteDescription(sdp);
+    conn.onOffer = async (sdp) => {
+      const answer = await this.cmdPeer?.createAnswer(sdp);
+      if (answer) {
+        conn.send('answer', JSON.stringify(answer));
+      }
+    };
   }
 
   private mqttOnConnect = async (conn: MqttClient) => {
@@ -213,7 +219,7 @@ export class PiCamera implements IPiCamera {
     }
 
     if (offer) {
-      conn.send('sdp', JSON.stringify(offer));
+      conn.send('offer', JSON.stringify(offer));
     }
   }
 
