@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <video id="videoElement" autoplay playsinline controls></video>
+    <script type="module">
+      import { PiCamera } from 'picamera.js';
+
+      const videoRef = document.getElementById('videoElement');
+      const camera = new PiCamera({
+        deviceUid: 'your-custom-uid',
+        mqttHost: 'your.mqtt.cloud',
+        mqttPath: '/mqtt',
+        mqttPort: 8884,
+        mqttUsername: 'hakunamatata',
+        mqttPassword: 'Wonderful',
+        stunUrls: ['stun:stun1.l.google.com:19302'],
+      });
+
+      camera.onStream = (stream) => {
+        videoRef.srcObject = stream ?? null;
+      };
+
+      camera.connect();
+    </script>
+  </body>
+</html>

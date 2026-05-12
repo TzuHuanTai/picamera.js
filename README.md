@@ -10,268 +10,66 @@
     <img src="https://img.shields.io/github/v/tag/TzuHuanTai/picamera.js?filter=v*&label=release&color=blue" alt="Release">
 </p>
 
-JavaScript client for [pi-webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC) — stream low-latency video/audio from Raspberry Pi using native WebRTC with hardware H264 encoding.
+Web and React Native client for [pi-webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC), with TypeScript typings and support for low-latency WebRTC streaming, P2P, SFU, DataChannel control, snapshots, and file transfer.
 
-Supports P2P, SFU, DataChannel control, and snapshot/file transfer over WebRTC.
+- Live demo: [PiCamera.js Demo](https://tzuhuantai.github.io/picamera.js/demo/)
+- Demo source: [demo/index.html](demo/index.html)
 
-## Installation
+## Quick Start
 
-```
+### Web
+
+```bash
 npm install picamera.js
 ```
 
-## Usage
+Web examples: [examples/web-live-video.html](examples/web-live-video.html)
 
-Check out the online demo: [Live Demo](https://tzuhuantai.github.io/picamera.js/demo/)
+### React Native
 
-You can also view the demo source code here: [index.html](demo/index.html).
+Install and configure [react-native-webrtc](https://github.com/react-native-webrtc/react-native-webrtc), then install `picamera.js`:
 
-### Examples:
-- [Live video](#live-video)
-- [Capture a snapshot only](#capture-a-snapshot-only)
-- [Send message for IPC via DataChannel](#send-message-for-ipc-via-datachannel)
-- [Download the latest video record](#download-the-latest-video-record)
-- [Set camera properties while streaming](#set-camera-properties-while-streaming)
-- [Start and stop recording](#start-and-stop-recording)
-- [Watch videos via the SFU server](#watch-videos-via-the-sfu-server)
+```bash
+npm install react-native-webrtc picamera.js
+```
 
-### Notes:
-- [Local IP or VPN address](#notes-on-local-ip-or-vpn-address)
-- [Mosquitto](#notes-on-mosquitto)
-- [Self-signed certificates](#notes-on-self-signed-certificates)
+Before creating a `PiCamera` instance, call `registerGlobals()` once at app startup:
 
-## API
+```javascript
+import { registerGlobals } from 'react-native-webrtc';
 
-[API Documentation](#api-documentation)
+registerGlobals();
+```
 
-## Example
+Minimal example: [examples/react-native-minimal.tsx](examples/react-native-minimal.tsx)
 
-These examples show how to use individual features separately.
+## Contents
 
-- ### Live video
+- [Examples](#examples)
+- [Notes](#notes)
+- [API Documentation](#api-documentation)
 
-  Display live streaming on the HTML `<video>` element.
+## Examples
+Standalone examples are available in [examples](examples):
 
-  ```html
-  <video id="videoElement"></video>
-  <script type="module">
-    import { PiCamera } from 'picamera.js';
+- [examples/react-native-minimal.tsx](examples/react-native-minimal.tsx): Minimal React Native setup using `RTCView` and `registerGlobals()`.
+- [examples/web-live-video.html](examples/web-live-video.html): Display a live stream in an HTML `<video>` element.
+- [examples/web-snapshot.js](examples/web-snapshot.js): Capture a snapshot over the command DataChannel.
+- [examples/web-ipc.js](examples/web-ipc.js): Send and receive IPC messages over a DataChannel.
+- [examples/web-download-video.js](examples/web-download-video.js): Download the latest recorded video file.
+- [examples/web-camera-control.js](examples/web-camera-control.js): Adjust camera settings with public control IDs.
+- [examples/web-recording.js](examples/web-recording.js): Start and stop remote recording.
+- [examples/web-sfu-video.js](examples/web-sfu-video.js): Play a stream through the SFU server.
 
-    let videoRef = document.getElementById('videoElement');
+For SFU deployment details, see [Broadcasting Live Stream to 1,000+ Viewers via SFU](https://github.com/TzuHuanTai/RaspberryPi-WebRTC/wiki/Advanced-Settings#broadcasting-live-stream-to-1000-viewers-via-sfu).
 
-    let conn = new PiCamera({
-      deviceUid: 'your-custom-uid',
-      mqttHost: 'your.mqtt.cloud',
-      mqttPath: '/mqtt',
-      mqttPort: '8884', // Websocket Port
-      mqttUsername: 'hakunamatata',
-      mqttPassword: 'Wonderful',
-      stunUrls: ["stun:stun1.l.google.com:19302"],
-    });
-    conn.onStream = (stream) => {
-      videoRef.srcObject = stream ?? null;
-    };
-    conn.connect();
-  </script>
-  ```
+## Notes
 
-- ### Capture a snapshot only
+### Notes on local IP or VPN address
+When running PiCamera.js on a local network or VPN, set `stunUrls` to `null` or omit it.
 
-  Use webrtc datachannel to get the snapshot image only.
-
-  ```javascript
-  let conn = new PiCamera({
-    deviceUid: 'your-custom-uid',
-    mqttHost: 'your.mqtt.cloud',
-    mqttPath: '/mqtt',
-    mqttPort: '8884', // Websocket Port
-    mqttUsername: 'hakunamatata',
-    mqttPassword: 'Wonderful',
-    stunUrls: ["stun:stun1.l.google.com:19302"],
-    datachannelOnly: true,
-  });
-
-  conn.onDatachannel = (id) => {
-    // on connected to remote datachannel
-    if (id === ChannelId.Command)
-      conn.snapshot();
-  }
-
-  conn.onSnapshot = (image) => {
-    // get a base64 image here, then terminate the connection.
-    conn.terminate();
-  }
-
-  conn.connect();
-  ```
-
-- ### Send message for IPC via DataChannel
-
-  Use WebRTC DataChannel to send messages to a Unix domain socket on the Raspberry Pi. This allows sending custom messages for inter-process communication (IPC).
-
-  ```javascript
-  let conn = new PiCamera({
-    deviceUid: 'your-custom-uid',
-    mqttHost: 'your.mqtt.cloud',
-    mqttPath: '/mqtt',
-    mqttPort: '8884', // Websocket Port
-    mqttUsername: 'hakunamatata',
-    mqttPassword: 'Wonderful',
-    stunUrls: ["stun:stun1.l.google.com:19302"],
-    datachannelOnly: true,
-    ipcMode: 'reliable'
-  });
-
-  conn.onDatachannel = (id) => {
-    // send data to the ipc listener in pi-webrtc
-    if (id === ChannelId.Reliable)
-      conn.sendText('Hello! this is picamera.js!');
-  }
-
-  conn.onMessage = (data) => {
-    // get IPC response msg here.
-    const text = new TextDecoder('utf-8').decode(data);
-  }
-
-  conn.connect();
-  ```
-
-- ### Download the latest video record
-
-  ```javascript
-  let conn = new PiCamera({
-    deviceUid: 'your-custom-uid',
-    mqttHost: 'your.mqtt.cloud',
-    mqttPath: '/mqtt',
-    mqttPort: '8884', // Websocket Port
-    mqttUsername: 'hakunamatata',
-    mqttPassword: 'Wonderful',
-    datachannelOnly: true,
-    stunUrls: ["stun:stun1.l.google.com:19302"],
-  });
-
-  conn.onDatachannel = () => {
-    // connected to remote datachannel and request the latest file.
-    conn.fetchVideoList();
-  }
-
-  conn.onVideoListLoaded = (res) => {
-    // retrieved the file's metadata and request download the target.
-    conn.downloadVideoFile(res.files[0].filepath);
-  }
-
-  conn.onProgress = (recv, total, type) => {
-    // show up downloading progress of the datachannel.
-  }
-
-  conn.onVideoDownloaded = (file) => {
-    // the file is completely downloaded.
-    const blob = new Blob([file], { type: 'video/mp4' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'video_filename.mp4';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    conn.terminate();
-  }
-
-  conn.connect();
-  ```
-
-- ### Set camera properties while streaming
-
-  This example only set auto-focus and auto white balance. Other properties see `CameraPropertyKey`.
-
-  ```javascript
-  let videoRef = document.getElementById('videoElement');
-
-  let conn = new PiCamera({
-    deviceUid: 'your-custom-uid',
-    mqttHost: 'your.mqtt.cloud',
-    mqttPath: '/mqtt',
-    mqttPort: '8884', // Websocket Port
-    mqttUsername: 'hakunamatata',
-    mqttPassword: 'Wonderful',
-    stunUrls: ["stun:stun1.l.google.com:19302"],
-  });
-    
-  conn.onStream = (stream) => {
-    videoRef.srcObject = stream ?? null;
-  };
-  conn.connect();
-
-  // click the button with onclick="setAwb()" when it's connected
-  setAwb = () => {
-    conn.setCameraControl(CameraControlId.AWB_MODE, AwbModeEnum.AWB_CLOUDY);
-  }
-
-  // click the button with onclick="setAf()" when it's connected
-  setAf = () => {
-    conn.setCameraControl(CameraControlId.AF_MODE, AfModeEnum.AF_MODE_CONTINUOUS);
-  }
-  ```
-
-- ### Start and stop recording
-
-  Use the command datachannel to remotely start or stop video recording on the Raspberry Pi. The server responds via `onRecording` with the current recording state.
-
-  ```javascript
-  let conn = new PiCamera({
-    deviceUid: 'your-custom-uid',
-    mqttHost: 'your.mqtt.cloud',
-    mqttPath: '/mqtt',
-    mqttPort: '8884',
-    mqttUsername: 'hakunamatata',
-    mqttPassword: 'Wonderful',
-    stunUrls: ["stun:stun1.l.google.com:19302"],
-    datachannelOnly: true,
-  });
-
-  conn.onDatachannel = (id) => {
-    if (id === ChannelId.Command) {
-      conn.startRecording();
-      setTimeout(() => conn.stopRecording(), 3000);
-    }
-  };
-
-  conn.onRecording = (res) => {
-    console.log('isRecording:', res.isRecording);
-    console.log('filepath:', res.filepath);
-  };
-
-  conn.connect();
-  ```
-
-- ### Watch videos via the SFU server
-
-  This example demonstrates how to watch a live stream through an SFU server.
-For more details, see [Broadcasting Live Stream to 1,000+ Viewers via SFU](https://github.com/TzuHuanTai/RaspberryPi-WebRTC/wiki/Advanced-Settings#broadcasting-live-stream-to-1000-viewers-via-sfu).
-  ```javascript
-  let videoRef = document.getElementById('videoElement');
-
-  let conn = new PiCamera({
-    signaling: 'websocket',
-    websocketUrl: 'wss://free1-api.picamera.live',
-    apiKey: 'APIz3LVTsM2bmNi',
-    roomId: 'the-room-name'
-  });
-
-  conn.onSfuStream = (sid, stream) => {
-    videoRef.srcObject = stream;
-  };
-
-  conn.connect();
-  ```
-
-## Notes on local IP or VPN address
-When running PiCamera.js over a local network or a VPN, set `stunUrls` to `null` or leave it out of the configuration altogether.
-
-## Notes on Mosquitto
-When running Mosquitto as your own MQTT server, we have experienced problems running Mosquitto with self-signed certificates with the MQTT client in PiCamera.js. Instead, run Mosquitto without SSL and then interpose nginx. For example:
+### Notes on Mosquitto
+When using Mosquitto as your MQTT server, self-signed certificates can cause issues with the PiCamera.js MQTT client. A common setup is to run Mosquitto without SSL and place nginx in front of it.
 
 ```
 # mosquitto.conf
@@ -283,7 +81,7 @@ protocol websockets
 allow_anonymous true
 ```
 
-Then interpose nginx's between the browser and Mosquitto. (This example assumes that the project files live in `/home/pi/src/project`, for example, with `run/` and `ssl/` and `logs/` and `dist/` subdirectories). It will run the secure port on 8443 (**not standard port 443!**). Change as you see fit -- this is for documentation purposes only.
+Then place nginx between the browser and Mosquitto. This example assumes files are under `/home/pi/src/project` with `run/`, `ssl/`, `logs/`, and `dist/` subdirectories. It serves HTTPS on port 8443 (not 443). Adjust as needed.
 
 ```nginx
 # nginx.conf
@@ -356,7 +154,7 @@ http {
 }
 ```
 
-This example would require PiCamera.js to be initialized as
+In this setup, initialize PiCamera.js as:
 
 ```javascript
 let conn = new PiCamera({
@@ -367,9 +165,8 @@ let conn = new PiCamera({
 });
 ```
 
-## Notes on self-signed certificates
-
-Most browsers require https for video to work. When using self-signed certificates, you first need to accept the browser's warning about the certificate. You also need to do this explicitly for the websocket host/port. In the above example, you would have to open https://your.mqtt.cloud:8884/ and accept the warning before the example works. Keep on eye on the browser's console to pick up on errors about self-signed certificates and open the `wss://` URLs it complains about as `https://` to accept the self-signed certificates.
+### Notes on self-signed certificates
+Most browsers require HTTPS for video. With self-signed certificates, you must accept certificate warnings in advance, including for the WebSocket host/port. In the example above, open https://your.mqtt.cloud:8884/ and accept the warning first. If the browser console reports `wss://` certificate errors, open the same endpoint as `https://` and accept it.
 
 ## API Documentation
 
@@ -416,7 +213,7 @@ Available flags for initialization.
 | mqttHost        | `string`   |         | The MQTT server host.                                        |
 | mqttPath        | `string`   | `/mqtt` | The MQTT server path.                                        |
 | mqttPort        | `number`   | `8884`  | The WebSocket port for the MQTT server.                      |
-| mqttProtocol    | `string`   | `wss`   | The portocol for the MQTT server.                            |
+| mqttProtocol    | `string`   | `wss`   | The protocol for the MQTT server.                            |
 | mqttUsername    | `string`   |         | The username for the MQTT server.                            |
 | mqttPassword    | `string`   |         | The password for the MQTT server.                            |
 | websocketUrl    | `string`   |         | The WebSocket URL used to connect to the SFU server.         |
@@ -432,7 +229,6 @@ Available flags for initialization.
 | ipcMode         | `string`  |          | Defines the communication mode for the IPC data channel. Accepts `lossy` (UDP-like) or `reliable` (TCP-like) modes. |
 | isMicOn         | `boolean`  | `true`  | Enables the local microphone stream by default if the connection is established. |
 | isSpeakerOn     | `boolean`  | `true`  | Enables the remote audio stream by default if the connection is established. |
-| credits         | `boolean`  | `true`  | Show watermark to run it under credits.                      |
 | codec           | `string`   |         | Codecs include `H264`, `VP8`, `VP9`, and `AV1`.              |
 
 ## Events
@@ -452,7 +248,7 @@ Available flags for initialization.
 
   `= (received: number, total: number, type: CommandType) => {}`
 
-  If any data transfer by datachannel, the on progress will give the received/total info.
+  Emitted during DataChannel transfers with received/total progress.
 
 - ### onStream
 
@@ -474,7 +270,7 @@ Available flags for initialization.
 
 - ### onVideoListLoaded
 
-  `= (metadata: VideoMetadata) => {}`
+  `= (res: QueryFileResponse) => {}`
 
   Emitted when the metadata of a recording file is retrieved.
 
@@ -494,7 +290,7 @@ Available flags for initialization.
 
   `= (msg: Uint8Array) => {}`
 
-  Emitted when get IPC message from the server.
+  Emitted when an IPC message is received from the server.
 
 - ### onRecording
 
@@ -515,7 +311,7 @@ Available flags for initialization.
 
   `= (quality: Quality[]) => {}`
 
-  Emitted when the quality of SFU connections change.
+  Emitted when SFU connection quality changes.
 
 - ### onSpeaking
 
@@ -535,7 +331,7 @@ Available flags for initialization.
 
   `.connect()`
 
-  Start trying to establish the WebRTC connection.
+  Starts establishing the WebRTC connection.
 
 - ### terminate
 
@@ -557,7 +353,7 @@ Available flags for initialization.
 
   `.fetchVideoList(time: Date)`
 
-  Retrieves metadata of recording files.
+  Retrieves recording file metadata.
 
   If called without arguments, returns metadata of the latest recorded file.
 
@@ -565,8 +361,8 @@ Available flags for initialization.
 
   If provided with a date, returns metadata of the closest recorded file to that time.
 
-  - path - The path to an existing recorded file; retrieves metadata of up to 8 older recordings before it.
-  - time - A specific date/time; retrieves metadata of the closest recorded file.
+  - path - Path to an existing recording; returns metadata for up to 8 older recordings.
+  - time - Date/time; returns metadata for the closest recording.
 
 - ### downloadVideoFile
 
@@ -580,7 +376,7 @@ Available flags for initialization.
 
   `.setCameraControl(key: CameraControlId, value: CameraControlValue)`
   
-  Sets camera properties, such as 3A or so.
+  Sets camera properties (for example, 3A controls).
 
 - ### snapshot
 
@@ -594,23 +390,23 @@ Available flags for initialization.
 
   `.startRecording()`
 
-  Sends a `START_RECORDING` command to the server via the command datachannel. The server's response is delivered via `onRecording`.
+  Sends a `START_RECORDING` command to the server via the command DataChannel. The server response is delivered via `onRecording`.
 
 - ### stopRecording
 
   `.stopRecording()`
 
-  Sends a `STOP_RECORDING` command to the server via the command datachannel. The server's response is delivered via `onRecording`.
+  Sends a `STOP_RECORDING` command to the server via the command DataChannel. The server response is delivered via `onRecording`.
 
 - ### sendText
 
-  `.(msg: string)`
+  `.sendText(msg: string)`
   
   If `ipcMode` is set to `reliable`, the message will be retransmitted until successfully delivered. If set to `lossy`, the message may be lost, but with lower latency.
 
 - ### sendData
 
-  `.(binary: Uint8Array)`
+  `.sendData(binary: Uint8Array)`
   
   Same as `sendText`, but sends in binary format.
 
@@ -630,11 +426,11 @@ Available flags for initialization.
 
 This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
 
-Included Third-Party Licenses
+Included third-party licenses
 mqtt: MIT License
 @livekit/protocol: Apache License 2.0
 See the NOTICE file for full license texts of third-party dependencies.
 
-Commercial License
+Commercial license
 If your use case does not permit compliance with the AGPL (e.g., source code disclosure), a commercial license is available.
 For more information, please contact: 📧 tzu.huan.tai@gmail.com
