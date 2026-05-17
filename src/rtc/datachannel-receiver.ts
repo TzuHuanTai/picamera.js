@@ -6,6 +6,8 @@ export type OnComplete = (body: Uint8Array) => void;
 export interface ReceiverEvent {
   onProgress?: OnProgress;
   onComplete: OnComplete;
+  /** Minimum interval in ms between onProgress calls. Defaults to 100. */
+  progressThrottleMs?: number;
 }
 
 export class DataChannelReceiver {
@@ -15,10 +17,13 @@ export class DataChannelReceiver {
 
   private onProgress?: OnProgress;
   private onComplete: OnComplete;
+  private progressThrottleMs: number;
+  private lastProgressTime: number = 0;
 
   constructor(event: ReceiverEvent) {
     this.onProgress = event.onProgress;
     this.onComplete = event.onComplete;
+    this.progressThrottleMs = event.progressThrottleMs ?? 100;
   }
 
   receiveData(packet: Packet) {
@@ -36,9 +41,14 @@ export class DataChannelReceiver {
 
       this.receivedLength += data.length;
 
-      this.onProgress?.(this.receivedLength, this.totalLength);
+      const isFinal = this.receivedLength >= this.totalLength;
+      const now = Date.now();
+      if (this.onProgress && (isFinal || now - this.lastProgressTime >= this.progressThrottleMs)) {
+        this.lastProgressTime = now;
+        this.onProgress(this.receivedLength, this.totalLength);
+      }
 
-      if (this.receivedLength >= this.totalLength) {
+      if (isFinal) {
         this.onComplete(this.fileBuffer);
       }
       return;
@@ -53,5 +63,6 @@ export class DataChannelReceiver {
     this.fileBuffer = null;
     this.totalLength = 0;
     this.receivedLength = 0;
+    this.lastProgressTime = 0;
   }
 }
