@@ -7,7 +7,7 @@ import {
 import { ChannelId } from './peer/rtc-peer';
 import { PiCamera } from './pi-camera';
 import { IPiCameraOptions, RNMediaStream } from './pi-camera.types';
-import { CommandType, FileEntry, QueryFileResponse } from './proto/packet';
+import { CommandType, FileEntry, QueryFileResponse, VideoSource } from './proto/packet';
 
 export {
   PiCamera,
@@ -18,6 +18,7 @@ export {
   CameraKeyLabels,
   CameraValueLabels,
   CommandType,
+  VideoSource,
   FileEntry,
   QueryFileResponse,
   RNMediaStream,

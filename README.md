@@ -347,22 +347,18 @@ Available flags for initialization.
 
 - ### fetchVideoList
 
-  `.fetchVideoList()`
-
-  `.fetchVideoList(path: string)`
-
-  `.fetchVideoList(time: Date)`
+  `.fetchVideoList(options?: { param?: string | Date, source?: VideoSource })`
 
   Retrieves recording file metadata.
 
   If called without arguments, returns metadata of the latest recorded file.
 
-  If provided with a file path, returns metadata of up to 8 older recordings before the given file.
+  If `param` is a file path (string), returns metadata of up to 8 older recordings before the given file.
 
-  If provided with a date, returns metadata of the closest recorded file to that time.
+  If `param` is a date, returns metadata of the closest recorded file to that time.
 
-  - path - Path to an existing recording; returns metadata for up to 8 older recordings.
-  - time - Date/time; returns metadata for the closest recording.
+  - `param` - (optional) A file path (`string`) or a `Date`; controls pagination/filtering.
+  - `source` - (optional) Filters results to the specified `VideoSource`.
 
 - ### downloadVideoFile
 
