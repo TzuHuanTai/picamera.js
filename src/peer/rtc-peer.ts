@@ -55,6 +55,10 @@ export class RtcPeer {
   private remoteStreamMap: Map<string, MediaStream> = new Map();
   private pendingIceCandidates: RTCIceCandidateInit[] = [];
   private channelReceivers: Record<ChannelLabel, ChannelReceiverGroup> = {} as Record<ChannelLabel, ChannelReceiverGroup>;
+  private messageQueue: Array<{ label: ChannelLabel; buffer: ArrayBuffer }> = [];
+  private messageQueueHead = 0;
+  private isProcessingQueue = false;
+  private yieldChannel: MessageChannel | null = null;
 
   // @ts-ignore noUnusedLocals
   private lossyChannel?: RTCDataChannel;
@@ -90,9 +94,15 @@ export class RtcPeer {
           this.reliableChannel = channel;
         }
 
+        channel.binaryType = "arraybuffer";
         this.createReceivers(label);
         channel.onmessage = (e) => this.onDataChannelMessage(label, e);
       }
+    }
+
+    if (typeof MessageChannel !== 'undefined') {
+      this.yieldChannel = new MessageChannel();
+      this.yieldChannel.port1.onmessage = () => this.drainQueue();
     }
   }
 
@@ -145,6 +155,13 @@ export class RtcPeer {
     this.onStream = undefined;
     this.onIceCandidate = undefined;
     this.onConnectionStateChange = undefined;
+
+    this.messageQueue = [];
+    this.messageQueueHead = 0;
+    this.isProcessingQueue = false;
+    this.yieldChannel?.port1.close();
+    this.yieldChannel?.port2.close();
+    this.yieldChannel = null;
     console.debug("webrtc peer is closed.");
   }
 
@@ -265,9 +282,37 @@ export class RtcPeer {
     };
   };
 
+  private scheduleYield(): void {
+    if (this.yieldChannel) {
+      this.yieldChannel.port2.postMessage(null);
+    } else {
+      setTimeout(() => this.drainQueue(), 0);
+    }
+  }
+
   protected onDataChannelMessage(label: ChannelLabel, event: MessageEvent): void {
-    const data = new Uint8Array(event.data as ArrayBuffer);
-    this.dispatchPayload(label, data);
+    this.messageQueue.push({ label, buffer: event.data as ArrayBuffer });
+    if (!this.isProcessingQueue) {
+      this.isProcessingQueue = true;
+      this.scheduleYield();
+    }
+  }
+
+  private drainQueue(): void {
+    const deadline = performance.now() + 5; // 5 ms budget per slice
+    const queue = this.messageQueue;
+    while (this.messageQueueHead < queue.length) {
+      const { label, buffer } = queue[this.messageQueueHead++];
+      this.dispatchPayload(label, new Uint8Array(buffer));
+      if (performance.now() >= deadline) {
+        this.scheduleYield(); // yield, resume on next task
+        return;
+      }
+    }
+    // Fully drained — compact to release references and reset head
+    this.messageQueue = [];
+    this.messageQueueHead = 0;
+    this.isProcessingQueue = false;
   }
 
   protected dispatchPayload(label: ChannelLabel, data: Uint8Array) {
