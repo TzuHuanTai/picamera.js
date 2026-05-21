@@ -31,6 +31,7 @@ export class DataChannelReceiver {
       this.totalLength = packet.streamHeader.totalLength;
       this.fileBuffer = new Uint8Array(this.totalLength);
       this.receivedLength = 0;
+      this.lastProgressTime = 0;
       return;
     }
 
