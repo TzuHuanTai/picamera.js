@@ -94,6 +94,7 @@ export class RtcPeer {
           this.reliableChannel = channel;
         }
 
+        channel.binaryType = "arraybuffer";
         this.createReceivers(label);
         channel.onmessage = (e) => this.onDataChannelMessage(label, e);
       }
