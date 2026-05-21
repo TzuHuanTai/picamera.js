@@ -56,6 +56,7 @@ export class RtcPeer {
   private pendingIceCandidates: RTCIceCandidateInit[] = [];
   private channelReceivers: Record<ChannelLabel, ChannelReceiverGroup> = {} as Record<ChannelLabel, ChannelReceiverGroup>;
   private messageQueue: Array<{ label: ChannelLabel; buffer: ArrayBuffer }> = [];
+  private messageQueueHead = 0;
   private isProcessingQueue = false;
   private yieldChannel: MessageChannel | null = null;
 
@@ -155,6 +156,7 @@ export class RtcPeer {
     this.onConnectionStateChange = undefined;
 
     this.messageQueue = [];
+    this.messageQueueHead = 0;
     this.isProcessingQueue = false;
     this.yieldChannel?.port1.close();
     this.yieldChannel?.port2.close();
@@ -297,14 +299,18 @@ export class RtcPeer {
 
   private drainQueue(): void {
     const deadline = performance.now() + 5; // 5 ms budget per slice
-    while (this.messageQueue.length > 0) {
-      const { label, buffer } = this.messageQueue.shift()!;
+    const queue = this.messageQueue;
+    while (this.messageQueueHead < queue.length) {
+      const { label, buffer } = queue[this.messageQueueHead++];
       this.dispatchPayload(label, new Uint8Array(buffer));
       if (performance.now() >= deadline) {
         this.scheduleYield(); // yield, resume on next task
         return;
       }
     }
+    // Fully drained — compact to release references and reset head
+    this.messageQueue = [];
+    this.messageQueueHead = 0;
     this.isProcessingQueue = false;
   }
 
