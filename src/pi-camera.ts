@@ -8,7 +8,7 @@ import { CommanderPeer } from './peer/commander-peer';
 import { SubscriberPeer } from './peer/subscriber-peer';
 import { PublisherPeer } from './peer/publisher-peer';
 import { DEFAULT } from './constants';
-import { CommandType, QueryFileResponse, RecordingResponse, VideoSource } from './proto/packet';
+import { CommandType, QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet';
 import { CameraControlId } from './proto/camera_control';
 import { CameraControlValue } from './constants/camera-property';
 
@@ -90,7 +90,7 @@ export class PiCamera implements IPiCamera {
     return this.cmdPeer.connectionState;
   }
 
-  fetchVideoList(options?: { param?: string | Date, source?: VideoSource }): void {
+  fetchVideoList(options?: { param?: string | Date, mode?: VideoMode }): void {
     if (this.onVideoListLoaded) {
       this.cmdPeer?.fetchVideoList(options);
     }

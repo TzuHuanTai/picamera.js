@@ -9,7 +9,7 @@ import {
   Speaking,
 } from './signaling/websocket-client';
 import { ChannelId, IpcMode } from './peer/rtc-peer';
-import { CommandType, QueryFileResponse, RecordingResponse, VideoSource } from './proto/packet';
+import { CommandType, QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet';
 import { CameraControlId } from './proto/camera_control';
 import { CameraControlValue } from './constants/camera-property';
 
@@ -173,12 +173,12 @@ export interface IPiCamera extends IPiCameraEvents {
   * - If called without arguments, returns metadata of the latest recorded file.
   * - If provided with a file path (`param`), returns metadata of up to 8 older recordings before the given file.
   * - If provided with a date (`param`), returns metadata of the closest recorded file to that time.
-  * - If provided with a `source`, filters results to that video source.
+  * - If provided with a `mode`, filters results to that video mode.
   * 
   * @param options.param - A file path (string) or date (Date) to paginate or filter results.
-  * @param options.source - The video source to filter the query.
+  * @param options.mode - The video mode to filter the query.
   */
-  fetchVideoList(options?: { param?: string | Date, source?: VideoSource }): void;
+  fetchVideoList(options?: { param?: string | Date, mode?: VideoMode }): void;
 
   /**
    * Requests a video file from the server.

@@ -347,7 +347,7 @@ Available flags for initialization.
 
 - ### fetchVideoList
 
-  `.fetchVideoList(options?: { param?: string | Date, source?: VideoSource })`
+  `.fetchVideoList(options?: { param?: string | Date, mode?: VideoMode })`
 
   Retrieves recording file metadata.
 
@@ -358,7 +358,7 @@ Available flags for initialization.
   If `param` is a date, returns metadata of the closest recorded file to that time.
 
   - `param` - (optional) A file path (`string`) or a `Date`; controls pagination/filtering.
-  - `source` - (optional) Filters results to the specified `VideoSource`.
+  - `mode` - (optional) Filters results to the specified `VideoMode`.
 
 - ### downloadVideoFile
 
