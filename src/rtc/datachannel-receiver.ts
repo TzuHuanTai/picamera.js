@@ -56,6 +56,9 @@ export class DataChannelReceiver {
     }
 
     if (packet.streamTrailer) {
+      if (this.totalLength === 0 && this.fileBuffer !== null) {
+        this.onComplete(this.fileBuffer);
+      }
       this.reset();
     }
   }

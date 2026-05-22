@@ -3,7 +3,8 @@ import {
   DisconnectRequest,
   Packet,
   QueryFileRequest,
-  QueryFileType
+  QueryFileType,
+  VideoMode
 } from "../proto/packet";
 import { CameraControlId } from "../proto/camera_control";
 import { CameraControlValue } from "../constants/camera-property";
@@ -77,9 +78,15 @@ export class CommanderPeer extends RtcPeer {
     return dataChannel;
   }
 
-  fetchVideoList = (param?: string | Date) => {
+  fetchVideoList = (options?: { param?: string | Date, mode?: VideoMode }) => {
+    const { param, mode } = options ?? {};
+
     if (this.cmdChannel.readyState === 'open' && this.onVideoListLoaded) {
       let queryRequest = QueryFileRequest.create();
+
+      if (mode !== undefined) {
+        queryRequest.mode = mode;
+      }
 
       if (param === undefined) {
         queryRequest.type = QueryFileType.LATEST_FILE;
