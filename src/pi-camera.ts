@@ -43,11 +43,10 @@ export class PiCamera implements IPiCamera {
 
     if (this.options.signaling === 'mqtt') {
       this.client = new MqttClient(this.options);
-      this.CreateCmdPeer(this.client as MqttClient);
-      this.client.onConnect = (conn) => this.mqttOnConnect(conn);
+      this.InitializeCmdPeer(this.client as MqttClient);
     } else if (this.options.signaling === 'websocket') {
       this.client = new WebSocketClient(this.options);
-      this.setSfuServerEvent(this.client as WebSocketClient);
+      this.InitializeSfuPeer(this.client as WebSocketClient);
     } else {
       throw ("unknow signaling method.")
     }
@@ -172,7 +171,7 @@ export class PiCamera implements IPiCamera {
     return config;
   }
 
-  private CreateCmdPeer = async (conn: MqttClient) => {
+  private InitializeCmdPeer = async (conn: MqttClient) => {
     this.cmdPeer = new CommanderPeer({
       options: this.options,
       ...this.getRtcConfig(this.options)
@@ -186,10 +185,9 @@ export class PiCamera implements IPiCamera {
       if (state === "connected" && this.client?.isConnected()) {
         // Sometime need to wait renegotiation after connection established.
         // this.client.disconnect();
-      } else if (state === "failed") {
-        this.terminate();
       }
     };
+    this.cmdPeer.onReconnectFailed = () => this.terminate();
 
     this.cmdPeer.onSnapshot = (base64) => this.onSnapshot?.(base64);
     this.cmdPeer.onVideoListLoaded = (res) => this.onVideoListLoaded?.(res);
@@ -198,6 +196,12 @@ export class PiCamera implements IPiCamera {
     this.cmdPeer.onDatachannel = (id) => this.onDatachannel?.(id);
     this.cmdPeer.onMessage = (data) => this.onMessage?.(data);
     this.cmdPeer.onRecording = (res) => this.onRecording?.(res);
+    this.cmdPeer.onOffer = async (offer) => {
+      if (this.options.codec && offer.sdp) {
+        offer.sdp = keepOnlyCodec(offer.sdp, this.options.codec);
+      }
+      conn.send('offer', JSON.stringify(offer));
+    }
 
     conn.onIceCandidate = (ice) => this.cmdPeer?.addIceCandidate(ice);
     conn.onAnswer = (sdp) => this.cmdPeer?.setRemoteDescription(sdp);
@@ -207,23 +211,16 @@ export class PiCamera implements IPiCamera {
         conn.send('answer', JSON.stringify(answer));
       }
     };
+    conn.onConnect = () => {
+      if (this.cmdPeer?.connectionState === 'new') {
+        this.cmdPeer.createOffer();
+      } else {
+        this.cmdPeer?.notifySignalingReconnected();
+      }
+    };
   }
 
-  private mqttOnConnect = async (conn: MqttClient) => {
-    console.debug("Mqtt connected!");
-
-    const offer = await this.cmdPeer?.createOffer();
-
-    if (this.options.codec && offer?.sdp) {
-      offer.sdp = keepOnlyCodec(offer.sdp, this.options.codec);
-    }
-
-    if (offer) {
-      conn.send('offer', JSON.stringify(offer));
-    }
-  }
-
-  private setSfuServerEvent(conn: WebSocketClient) {
+  private InitializeSfuPeer(conn: WebSocketClient) {
     conn.onConnect = () => {
       // console.debug("WebSocket connected!");
     };
@@ -239,6 +236,10 @@ export class PiCamera implements IPiCamera {
           conn.send('tricklePublisher', JSON.stringify(ev.candidate));
         }
       }
+      this.pubPeer.onOffer = async (offer) => {
+        conn.send('offer', offer.sdp);
+      }
+      this.pubPeer.onReconnectFailed = () => this.terminate();
 
       this.subPeer = new SubscriberPeer(config);
       this.subPeer.onMessage = (data) => this.onMessage?.(data);
@@ -249,9 +250,9 @@ export class PiCamera implements IPiCamera {
           conn.send('trickleSubscriber', JSON.stringify(ev.candidate));
         }
       }
+      this.subPeer.onReconnectFailed = () => this.terminate();
 
-      const offer = await this.pubPeer.createOffer();
-      conn.send('offer', offer.sdp);
+      await this.pubPeer.createOffer();
 
       // conn.publish("addAudioTrack", this.trackId);
     };

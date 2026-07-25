@@ -48,6 +48,9 @@ export class RtcPeer {
   onSfuStream?: (sid: string, stream: MediaStream) => void;
   onIceCandidate?: ((ev: RTCPeerConnectionIceEvent) => any);
   onConnectionStateChange?: ((ev: RTCPeerConnectionState) => any);
+  onOffer?: ((offer: RTCSessionDescriptionInit) => any);
+  onAnswer?: ((answer: RTCSessionDescriptionInit) => any);
+  onReconnectFailed?: (() => any);
 
   readonly options: IPiCameraOptions;
   protected peer: RTCPeerConnection;
@@ -59,6 +62,15 @@ export class RtcPeer {
   private messageQueueHead = 0;
   private isProcessingQueue = false;
   private yieldChannel: MessageChannel | null = null;
+
+  private readonly MAX_ICE_RESTART_ATTEMPTS = 3;
+  private readonly DISCONNECT_RESTART_DELAY_MS = 3000;
+  private readonly ICE_RESTART_TIMEOUT_MS = 8000;
+  private iceRestartAttempts = 0;
+  private reconnectFailed = false;
+  private disconnectTimer?: ReturnType<typeof setTimeout>;
+  private iceRestartTimer?: ReturnType<typeof setTimeout>;
+  private negotiationReady = false;
 
   // @ts-ignore noUnusedLocals
   private lossyChannel?: RTCDataChannel;
@@ -75,7 +87,28 @@ export class RtcPeer {
       }
     }
     this.peer.onconnectionstatechange = () => {
-      this.onConnectionStateChange?.(this.peer.connectionState);
+      const state = this.peer.connectionState;
+      this.onConnectionStateChange?.(state);
+
+      if (state === "connected") {
+        this.clearDisconnectTimer();
+        this.clearIceRestartTimer();
+        this.iceRestartAttempts = 0;
+        this.reconnectFailed = false;
+        this.negotiationReady = true;
+      } else if (state === "failed") {
+        this.clearDisconnectTimer();
+        this.tryRestartIce();
+      } else if (state === "disconnected") {
+        this.clearDisconnectTimer();
+        this.disconnectTimer = setTimeout(() => {
+          this.disconnectTimer = undefined;
+          const currentState = this.peer.connectionState;
+          if (currentState === "disconnected" || currentState === "failed") {
+            this.tryRestartIce();
+          }
+        }, this.DISCONNECT_RESTART_DELAY_MS);
+      }
     }
 
 
@@ -99,6 +132,26 @@ export class RtcPeer {
         channel.onmessage = (e) => this.onDataChannelMessage(label, e);
       }
     }
+
+    this.peer.onnegotiationneeded = async () => {
+      try {
+        if (!this.negotiationReady) {
+          console.debug("onnegotiationneeded: skipped before initial offer is sent");
+          return;
+        }
+
+        if (this.peer.signalingState !== "stable") {
+          console.debug("signaling state is not `stable`:", this.peer.signalingState);
+          return;
+        }
+
+        console.debug("onnegotiationneeded: creating offer");
+        this.createOffer();
+
+      } catch (err) {
+        console.error("Error during negotiationneeded:", err);
+      }
+    };
 
     if (typeof MessageChannel !== 'undefined') {
       this.yieldChannel = new MessageChannel();
@@ -146,6 +199,12 @@ export class RtcPeer {
     this.peer.onicecandidate = null;
     this.peer.onconnectionstatechange = null;
 
+    this.clearDisconnectTimer();
+    this.clearIceRestartTimer();
+    this.iceRestartAttempts = 0;
+    this.reconnectFailed = false;
+    this.negotiationReady = false;
+
     this.onSnapshot = undefined;
     this.onVideoListLoaded = undefined;
     this.onProgress = undefined;
@@ -155,6 +214,7 @@ export class RtcPeer {
     this.onStream = undefined;
     this.onIceCandidate = undefined;
     this.onConnectionStateChange = undefined;
+    this.onReconnectFailed = undefined;
 
     this.messageQueue = [];
     this.messageQueueHead = 0;
@@ -173,7 +233,7 @@ export class RtcPeer {
     const offer = await this.peer.createOffer(options);
     await this.peer.setLocalDescription(offer);
     console.debug("createOffer: ", offer);
-    return offer;
+    this.onOffer?.(offer);
   }
 
   createAnswer = async (sd: RTCSessionDescriptionInit) => {
@@ -233,6 +293,54 @@ export class RtcPeer {
       track.enabled = isOn;
     });
   };
+
+  notifySignalingReconnected = (): void => {
+    const state = this.peer.connectionState;
+    if (state !== "disconnected" && state !== "failed") {
+      return;
+    }
+    console.debug("Signaling reconnected, retrying ICE restart immediately.");
+    this.clearDisconnectTimer();
+    this.tryRestartIce();
+  }
+
+  private tryRestartIce(): void {
+    if (this.reconnectFailed || this.peer.connectionState === "closed") {
+      return;
+    }
+    if (this.iceRestartAttempts >= this.MAX_ICE_RESTART_ATTEMPTS) {
+      this.reconnectFailed = true;
+      console.warn(`ICE restart failed after ${this.MAX_ICE_RESTART_ATTEMPTS} attempts, giving up.`);
+      this.onReconnectFailed?.();
+      return;
+    }
+    this.iceRestartAttempts++;
+    console.log(`ICE restart attempt ${this.iceRestartAttempts}/${this.MAX_ICE_RESTART_ATTEMPTS}...`);
+    this.peer.restartIce();
+
+    this.clearIceRestartTimer();
+    this.iceRestartTimer = setTimeout(() => {
+      this.iceRestartTimer = undefined;
+      const state = this.peer.connectionState;
+      if (state !== "connected" && state !== "closed") {
+        this.tryRestartIce();
+      }
+    }, this.ICE_RESTART_TIMEOUT_MS);
+  }
+
+  private clearDisconnectTimer(): void {
+    if (this.disconnectTimer !== undefined) {
+      clearTimeout(this.disconnectTimer);
+      this.disconnectTimer = undefined;
+    }
+  }
+
+  private clearIceRestartTimer(): void {
+    if (this.iceRestartTimer !== undefined) {
+      clearTimeout(this.iceRestartTimer);
+      this.iceRestartTimer = undefined;
+    }
+  }
 
   private handleTrack = (event: RTCTrackEvent) => {
     const [sid] = event.streams[0].id.split('|');

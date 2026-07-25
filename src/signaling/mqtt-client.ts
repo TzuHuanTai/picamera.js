@@ -40,7 +40,7 @@ export class MqttClient implements ISignalingClient<MqttClient, MqttTopicType> {
       protocolVersion: 5,
       clean: true,
       manualConnect: true,
-      reconnectPeriod: 0,
+      reconnectPeriod: 3000,
     };
 
     this.client = mqtt.connect(connectionOptions);
@@ -61,6 +61,18 @@ export class MqttClient implements ISignalingClient<MqttClient, MqttTopicType> {
     });
 
     this.client.on('message', (topic, message) => this.handleMessage(topic, message.toString()));
+
+    this.client.on('reconnect', () => {
+      console.debug(`MQTT reconnecting to "${this.options.deviceUid}"...`);
+    });
+
+    this.client.on('close', () => {
+      console.debug(`MQTT connection closed for "${this.options.deviceUid}".`);
+    });
+
+    this.client.on('error', (err) => {
+      console.error('MQTT client error:', err);
+    });
 
     this.client.connect();
   }
@@ -87,7 +99,7 @@ export class MqttClient implements ISignalingClient<MqttClient, MqttTopicType> {
 
   send = (topic: MqttTopicType, message: string) => {
     if (!this.isConnected()) {
-      console.warn("Publish failed: client is not connected.");
+      console.warn(`Publish ${topic} failed: mqtt client is not connected.`);
       return;
     }
 
