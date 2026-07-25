@@ -153,7 +153,7 @@ export class WebSocketClient implements ISignalingClient<WebSocketClient, Websoc
 
   send = (action: WebsocketActionType, message: string = '') => {
     if (!this.isConnected()) {
-      console.warn("Publish failed: client is not connected.");
+      console.warn(`Publish ${action} failed: ws client is not connected.`);
       return;
     }
 
