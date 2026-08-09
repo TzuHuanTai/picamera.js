@@ -47,9 +47,12 @@
     "./*": "./build/*.js"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "esbuild": "^0.25.0",
+    "jest": "^30.4.2",
     "mkdirp": "^3.0.1",
     "rimraf": "^6.1.2",
+    "ts-jest": "^29.4.10",
     "ts-proto": "^2.11.2",
     "typescript": "^5.9.3"
   },
