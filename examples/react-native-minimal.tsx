@@ -9,7 +9,7 @@ export default function App() {
 
   useEffect(() => {
     const camera = new PiCamera({
-      deviceUid: 'your-custom-uid',
+      uid: 'your-custom-uid',
       mqttHost: 'your.mqtt.cloud',
       mqttPath: '/mqtt',
       mqttPort: 8884,

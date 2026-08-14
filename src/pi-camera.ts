@@ -2,11 +2,14 @@ import { MqttClient } from './signaling/mqtt-client';
 import { keepOnlyCodec } from './utils/rtc-tools';
 import { ISignalingClient } from './signaling/signaling-client';
 import { IPiCamera, IPiCameraOptions } from './pi-camera.types';
-import { Participant, Quality, RoomInfo, Speaking, WebSocketClient } from './signaling/websocket-client';
+import { LiveKitClient, Participant, Quality, RoomInfo, Speaking } from './signaling/livekit-client';
+import { CloudflareClient } from './signaling/cloudflare-client';
+import { DeviceSession } from './signaling/picamera-api';
 import { ChannelId, RtcPeerConfig } from './peer/rtc-peer';
 import { CommanderPeer } from './peer/commander-peer';
 import { SubscriberPeer } from './peer/subscriber-peer';
 import { PublisherPeer } from './peer/publisher-peer';
+import { CloudflarePeer } from './peer/cloudflare-peer';
 import { DEFAULT } from './constants';
 import { CommandType, QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet';
 import { CameraControlId } from './proto/camera_control';
@@ -24,11 +27,13 @@ export class PiCamera implements IPiCamera {
   onMessage?: (data: Uint8Array) => void;
   onRecording?: (res: RecordingResponse) => void;
   onTimeout?: () => void;
+  onError?: (err: Error) => void;
 
   onRoomInfo?: (room: RoomInfo) => void;
   onQuility?: (quality: Quality[]) => void;
   onSpeaking?: (speaking: Speaking[]) => void;
   onParticipant?: (participant: Participant[]) => void;
+  onDeviceSession?: (session: DeviceSession) => void;
 
   private options: IPiCameraOptions;
   private client: ISignalingClient<any, any>;
@@ -37,6 +42,7 @@ export class PiCamera implements IPiCamera {
   private cmdPeer?: CommanderPeer;
   private subPeer?: SubscriberPeer;
   private pubPeer?: PublisherPeer;
+  private cfPeer?: CloudflarePeer;
 
   constructor(options: IPiCameraOptions) {
     this.options = this.initializeOptions(options);
@@ -44,9 +50,12 @@ export class PiCamera implements IPiCamera {
     if (this.options.signaling === 'mqtt') {
       this.client = new MqttClient(this.options);
       this.InitializeCmdPeer(this.client as MqttClient);
-    } else if (this.options.signaling === 'websocket') {
-      this.client = new WebSocketClient(this.options);
-      this.InitializeSfuPeer(this.client as WebSocketClient);
+    } else if (this.options.signaling === 'livekit') {
+      this.client = new LiveKitClient(this.options);
+      this.InitializeSfuPeer(this.client as LiveKitClient);
+    } else if (this.options.signaling === 'cloudflare') {
+      this.client = new CloudflareClient(this.options);
+      this.InitializeCloudflarePeer(this.client as CloudflareClient);
     } else {
       throw ("unknow signaling method.")
     }
@@ -59,7 +68,8 @@ export class PiCamera implements IPiCamera {
       this.rtcTimer = setTimeout(() => {
         if (this.cmdPeer?.connectionState === 'connected' ||
           this.subPeer?.connectionState === 'connected' ||
-          this.pubPeer?.connectionState === 'connected') {
+          this.pubPeer?.connectionState === 'connected' ||
+          this.cfPeer?.connectionState === 'connected') {
           return;
         }
         if (this.onTimeout) {
@@ -77,16 +87,22 @@ export class PiCamera implements IPiCamera {
     this.cmdPeer?.close();
     this.subPeer?.close();
     this.pubPeer?.close();
+    this.cfPeer?.close();
     this.client.disconnect();
     this.onConnectionState?.('closed');
     console.debug("PiCamera connections had been terminated.");
   }
 
   getStatus = (): RTCPeerConnectionState => {
-    if (!this.cmdPeer) {
-      return 'new';
+    const peer = this.cmdPeer ?? this.subPeer ?? this.cfPeer;
+    return peer ? peer.connectionState : 'new';
+  }
+
+  refresh = async (): Promise<number> => {
+    if (this.client instanceof CloudflareClient) {
+      return this.client.refresh();
     }
-    return this.cmdPeer.connectionState;
+    return 0;
   }
 
   fetchVideoList(options?: { param?: string | Date, mode?: VideoMode }): void {
@@ -220,7 +236,7 @@ export class PiCamera implements IPiCamera {
     };
   }
 
-  private InitializeSfuPeer(conn: WebSocketClient) {
+  private InitializeSfuPeer(conn: LiveKitClient) {
     conn.onConnect = () => {
       // console.debug("WebSocket connected!");
     };
@@ -245,6 +261,7 @@ export class PiCamera implements IPiCamera {
       this.subPeer.onMessage = (data) => this.onMessage?.(data);
       this.subPeer.onStream = (stream) => this.onStream?.(stream);
       this.subPeer.onSfuStream = (sid, stream) => this.onSfuStream?.(sid, stream);
+      this.subPeer.onConnectionStateChange = (state) => this.onConnectionState?.(state);
       this.subPeer.onIceCandidate = (ev) => {
         if (ev.candidate) {
           conn.send('trickleSubscriber', JSON.stringify(ev.candidate));
@@ -282,5 +299,34 @@ export class PiCamera implements IPiCamera {
     conn.onSpeaking = (msg) => this.onSpeaking?.(msg);
 
     conn.onLeave = async () => conn.disconnect();
+  }
+
+  private InitializeCloudflarePeer(conn: CloudflareClient) {
+    conn.onDeviceSession = (session) => this.onDeviceSession?.(session);
+    conn.onError = (err) => this.onError?.(err);
+
+    conn.onJoin = (iceServers) => {
+      const config: RtcPeerConfig = {
+        options: this.options,
+        iceServers: iceServers,
+        // Cloudflare puts every pulled track on one transport.
+        bundlePolicy: 'max-bundle',
+      };
+
+      this.cfPeer = new CloudflarePeer(config);
+      this.cfPeer.onStream = (stream) => this.onStream?.(stream);
+      this.cfPeer.onSfuStream = (trackName, stream) => this.onSfuStream?.(trackName, stream);
+      this.cfPeer.onConnectionStateChange = (state) => this.onConnectionState?.(state);
+      this.cfPeer.onReconnectFailed = () => this.terminate();
+    };
+
+    conn.onTrackMap = (map) => this.cfPeer?.setTrackNames(map);
+
+    conn.onOffer = async (sdp) => {
+      const answer = await this.cfPeer?.createAnswer(sdp);
+      if (answer?.sdp) {
+        conn.send('answer', answer.sdp);
+      }
+    };
   }
 }

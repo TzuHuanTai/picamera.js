@@ -59,7 +59,8 @@ Standalone examples are available in [examples](examples):
 - [examples/web-download-video.js](examples/web-download-video.js): Download the latest recorded video file.
 - [examples/web-camera-control.js](examples/web-camera-control.js): Adjust camera settings with public control IDs.
 - [examples/web-recording.js](examples/web-recording.js): Start and stop remote recording.
-- [examples/web-sfu-video.js](examples/web-sfu-video.js): Play a stream through the SFU server.
+- [examples/web-sfu-video.js](examples/web-sfu-video.js): Play a stream through the LiveKit SFU.
+- [examples/web-cloudflare-video.js](examples/web-cloudflare-video.js): Pull a device's tracks from the Cloudflare Realtime SFU.
 
 For SFU deployment details, see [Broadcasting Live Stream to 1,000+ Viewers via SFU](https://github.com/TzuHuanTai/RaspberryPi-WebRTC/wiki/Advanced-Settings#broadcasting-live-stream-to-1000-viewers-via-sfu).
 
@@ -158,7 +159,7 @@ In this setup, initialize PiCamera.js as:
 
 ```javascript
 let conn = new PiCamera({
-  deviceUid: 'some-unique-uuid',      // must match pi_webrtc's --uid argument
+  uid: 'some-unique-uuid',            // must match pi_webrtc's --uid argument
   mqttHost: window.location.hostname, // same host and
   mqttPort: window.location.port,     // port as page itself
   mqttPath: '/mqtt',                  // to match nginx.conf configuration
@@ -183,14 +184,17 @@ Most browsers require HTTPS for video. With self-signed certificates, you must a
   * [onMessage](#onmessage)
   * [onRecording](#onrecording)
   * [onTimeout](#onTimeout)
+  * [onError](#onerror)
   * [onRoomInfo](#onroominfo)
   * [onQuility](#onquility)
   * [onSpeaking](#onspeaking)
   * [onParticipant](#onparticipant)
+  * [onDeviceSession](#ondevicesession)
 * [Methods](#methods)
   * [connect](#connect)
   * [terminate](#terminate)
   * [getStatus](#getStatus)
+  * [refresh](#refresh)
   * [fetchVideoList](#fetchVideoList)
   * [downloadVideoFile](#downloadVideoFile)
   * [setCameraControl](#setCameraControl)
@@ -208,18 +212,20 @@ Available flags for initialization.
 
 | Option          | Type       | Default | Description                                                  |
 | --------------- | ---------- | ------- | ------------------------------------------------------------ |
-| signaling       | `'mqtt' \| 'websocket'` | `mqtt` | The signaling method.                            |
-| deviceUid       | `string`   |         | The custom `--uid` provided in the running `pi_webrtc`.      |
+| signaling       | `'mqtt' \| 'livekit' \| 'cloudflare'` | `mqtt` | Which backend the device is reachable through. |
+| uid             | `string`   |         | The custom `--uid` provided in the running `pi_webrtc`. Used by `mqtt` and `cloudflare`. |
 | mqttHost        | `string`   |         | The MQTT server host.                                        |
 | mqttPath        | `string`   | `/mqtt` | The MQTT server path.                                        |
 | mqttPort        | `number`   | `8884`  | The WebSocket port for the MQTT server.                      |
 | mqttProtocol    | `string`   | `wss`   | The protocol for the MQTT server.                            |
 | mqttUsername    | `string`   |         | The username for the MQTT server.                            |
 | mqttPassword    | `string`   |         | The password for the MQTT server.                            |
-| websocketUrl    | `string`   |         | The WebSocket URL used to connect to the SFU server.         |
-| apiKey          | `string`   |         | The API key used to authenticate with the SFU server.        |
+| livekitUrl      | `string`   |         | The WebSocket URL of the LiveKit relay. Matches `pi_webrtc`'s `--livekit-url`. |
+| livekitKey      | `string`   |         | The key LiveKit issued, matching `pi_webrtc`'s `--livekit-key`. Not the same as `apiKey`. |
+| livekitRoom     | `string`   |         | The room to join. Matches `pi_webrtc`'s `--livekit-room`.    |
 | userId          | `string`   | `(random uuid)` | The user identifier displayed in the room after joining the SFU server. |
-| roomId          | `string`   |         | The room ID used to join a session on the SFU server.        |
+| apiUrl          | `string`   |         | Base URL of the picamera device API, which fronts both SFU backends. |
+| apiKey          | `string`   |         | The device API's viewer key, sent as `Authorization: Bearer`. |
 | stunUrls        | `string[]` |         | An array of STUN server URLs for WebRTC. Leave out or set to null for local network or VPN IP addresses. |
 | turnUrls        | `string[]` |         | The TURN server URL for WebRTC.                              |
 | turnUsername    | `string`   |         | The username for the TURN server.                            |
@@ -260,7 +266,7 @@ Available flags for initialization.
 
   `= (sid: string, stream: MediaStream) => {}`
 
-  Triggered only when a media stream is received from the SFU, delivering both the participant's server-side ID (sid) and the associated MediaStream. 
+  Triggered only when a media stream is received from the SFU, delivering both the participant's server-side ID (sid) and the associated MediaStream. On the `cloudflare` path there are no participants, so the first argument is the name of the track that was pulled.
 
 - ### onSnapshot
 
@@ -285,6 +291,18 @@ Available flags for initialization.
   `= () => {}`
 
   Emitted when the P2P connection cannot be established within the allotted time. Automatically calls the `terminate()` function.
+
+- ### onError
+
+  `= (err: Error) => {}`
+
+  Emitted when signaling fails for a reason worth putting in front of a user — a device that has never reported a session, one that is registered but not publishing, a track the SFU refused. Distinct from `onTimeout`, which only says the peer never came up.
+
+- ### onDeviceSession
+
+  `= (session: DeviceSession) => {}`
+
+  Emitted on the `cloudflare` path once the device's session record has been read, before the peer is built. Cloudflare mints a new session id on every device reconnect, so this is the only place the current one is visible.
 
 - ### onMessage
 
@@ -344,6 +362,12 @@ Available flags for initialization.
   `.getStatus()` 
   
   Retrieves the current connection status.
+
+- ### refresh
+
+  `.refresh(): Promise<number>`
+
+  Pulls whatever the device has started publishing since the connection was established, and resolves to how many tracks that was. Rejects if the SFU refuses. Only the `cloudflare` path has anything to re-read; elsewhere new tracks arrive on their own and this resolves to `0`.
 
 - ### fetchVideoList
 
