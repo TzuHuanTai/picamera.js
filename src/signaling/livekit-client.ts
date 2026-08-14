@@ -1,13 +1,27 @@
 import { ISignalingClient, generateUUID } from './signaling-client';
 
-export interface IWebSocketConnectionOptions {
-  websocketUrl?: string;
-  apiKey?: string;
+export interface ILiveKitConnectionOptions {
+  /**
+   * The LiveKit relay to dial, e.g. wss://picamera-hono.<account>.workers.dev.
+   * Matches pi-webrtc's `--livekit-url`.
+   */
+  livekitUrl?: string;
+
+  /**
+   * Matches pi-webrtc's `--livekit-key`. Issued by LiveKit, and not the same thing as the
+   * `apiKey` of the picamera device API — the relay compares this one against its own
+   * LIVEKIT_API_KEY before it mints an access token.
+   */
+  livekitKey?: string;
+
+  /** The room to join. Matches pi-webrtc's `--livekit-room`. */
+  livekitRoom?: string;
+
+  /** Becomes the LiveKit participant identity. A random uuid when omitted. */
   userId?: string;
-  roomId?: string;
 }
 
-export type WebsocketActionType = 'join' | 'offer' | 'answer' |
+export type LiveKitActionType = 'join' | 'offer' | 'answer' |
   'trickle' | 'addVideoTrack' | 'addAudioTrack' |
   'trackPublished' | 'leave' | 'close' | 'ping' |
   'tricklePublisher' | 'trickleSubscriber' |
@@ -17,7 +31,7 @@ export type WebsocketActionType = 'join' | 'offer' | 'answer' |
 type TrickleTarget = 'PUBLISHER' | 'SUBSCRIBER';
 
 interface ProxyMessage {
-  action: WebsocketActionType;
+  action: LiveKitActionType;
   message: string;
 }
 
@@ -60,15 +74,15 @@ class TrickleResponse {
   }
 }
 
-export class WebSocketClient implements ISignalingClient<WebSocketClient, WebsocketActionType> {
+export class LiveKitClient implements ISignalingClient<LiveKitClient, LiveKitActionType> {
   private url?: string;
-  private apiKey: string;
+  private livekitKey: string;
   private userId: string;
   private roomId: string;
   private client?: WebSocket;
   private pingInterval?: NodeJS.Timeout;
 
-  onConnect?: (conn: WebSocketClient) => void;
+  onConnect?: (conn: LiveKitClient) => void;
   onJoin?: (server: RTCIceServer) => void;
   onOffer?: (offer: RTCSessionDescriptionInit) => void;
   onAnswer?: (answer: RTCSessionDescriptionInit) => void;
@@ -81,16 +95,16 @@ export class WebSocketClient implements ISignalingClient<WebSocketClient, Websoc
   onTrackPublished?: () => void;
   onLeave?: () => void;
 
-  constructor(options: IWebSocketConnectionOptions) {
-    this.url = options.websocketUrl;
-    this.apiKey = options.apiKey ?? '';
+  constructor(options: ILiveKitConnectionOptions) {
+    this.url = options.livekitUrl;
+    this.livekitKey = options.livekitKey ?? '';
     this.userId = options.userId ?? generateUUID();
-    this.roomId = options.roomId ?? '';
+    this.roomId = options.livekitRoom ?? '';
   }
 
   connect = () => {
     const params = new URLSearchParams({
-      apiKey: this.apiKey,
+      apiKey: this.livekitKey,
       userId: this.userId,
       roomId: this.roomId,
     });
@@ -151,7 +165,7 @@ export class WebSocketClient implements ISignalingClient<WebSocketClient, Websoc
     }
   }
 
-  send = (action: WebsocketActionType, message: string = '') => {
+  send = (action: LiveKitActionType, message: string = '') => {
     if (!this.isConnected()) {
       console.warn(`Publish ${action} failed: ws client is not connected.`);
       return;

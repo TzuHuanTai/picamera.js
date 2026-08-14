@@ -2,10 +2,10 @@ import { PiCamera } from 'picamera.js';
 
 const videoRef = document.getElementById('videoElement');
 const camera = new PiCamera({
-  signaling: 'websocket',
-  websocketUrl: 'wss://free1-api.picamera.live',
-  apiKey: 'APIz3LVTsM2bmNi',
-  roomId: 'the-room-name',
+  signaling: 'livekit',
+  livekitUrl: 'wss://api.picamera.live',
+  livekitKey: 'APIWnQTs4tmUZvA',
+  livekitRoom: 'my-first-room',
 });
 
 camera.onSfuStream = (_sid, stream) => {

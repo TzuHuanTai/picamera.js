@@ -5,7 +5,6 @@ import { IPiCameraOptions } from '../pi-camera.types';
 export type MqttTopicType = 'offer' | 'answer' | 'ice';
 
 export interface IMqttConnectionOptions {
-  deviceUid?: string;
   mqttHost?: string;
   mqttPath?: string;
   mqttPort?: number;
@@ -48,7 +47,7 @@ export class MqttClient implements ISignalingClient<MqttClient, MqttTopicType> {
 
   connect = () => {
     this.client.on('connect', () => {
-      console.debug(`MQTT connected to "${this.options.deviceUid}" with clientId: ${this.clientId}`);
+      console.debug(`MQTT connected to "${this.options.uid}" with clientId: ${this.clientId}`);
 
       const fullTopics = this.topics.map((t) => this.getFullTopic(t));
       this.client.subscribe(fullTopics, { qos: 2, nl: true }, (err) => {
@@ -63,11 +62,11 @@ export class MqttClient implements ISignalingClient<MqttClient, MqttTopicType> {
     this.client.on('message', (topic, message) => this.handleMessage(topic, message.toString()));
 
     this.client.on('reconnect', () => {
-      console.debug(`MQTT reconnecting to "${this.options.deviceUid}"...`);
+      console.debug(`MQTT reconnecting to "${this.options.uid}"...`);
     });
 
     this.client.on('close', () => {
-      console.debug(`MQTT connection closed for "${this.options.deviceUid}".`);
+      console.debug(`MQTT connection closed for "${this.options.uid}".`);
     });
 
     this.client.on('error', (err) => {
@@ -114,12 +113,12 @@ export class MqttClient implements ISignalingClient<MqttClient, MqttTopicType> {
     this.client.unsubscribe(fullTopics);
     this.client.end(true);
 
-    console.debug(`MQTT disconnected from "${this.options.deviceUid}" with clientId: ${this.clientId}`);
+    console.debug(`MQTT disconnected from "${this.options.uid}" with clientId: ${this.clientId}`);
   }
 
   isConnected = (): boolean => this.client.connected ?? false;
 
   private getFullTopic(topic: MqttTopicType): string {
-    return `${this.options.deviceUid}/${topic}/${this.clientId}`;
+    return `${this.options.uid}/${topic}/${this.clientId}`;
   }
 }

@@ -1,13 +1,15 @@
 import { CodecType } from './utils/rtc-tools';
 import { IMqttConnectionOptions, MqttTopicType } from './signaling/mqtt-client';
 import {
-  IWebSocketConnectionOptions,
-  WebsocketActionType,
+  ILiveKitConnectionOptions,
+  LiveKitActionType,
   Participant,
   Quality,
   RoomInfo,
   Speaking,
-} from './signaling/websocket-client';
+} from './signaling/livekit-client';
+import { CloudflareActionType } from './signaling/cloudflare-client';
+import { DeviceSession, IApiConnectionOptions } from './signaling/picamera-api';
 import { ChannelId, IpcMode } from './peer/rtc-peer';
 import { CommandType, QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet';
 import { CameraControlId } from './proto/camera_control';
@@ -22,10 +24,27 @@ export interface RNMediaStream extends MediaStream {
   toURL(): string;
 }
 
-export type SignalingType = 'mqtt' | 'websocket';
+/**
+ * Which backend the device is reachable through. Named for the backend rather than for the
+ * transport, matching pi-webrtc's `--use-mqtt` / `--use-livekit` / `--use-cloudflare`; both SFU
+ * options in fact reach their backend through the same picamera device API.
+ */
+export type SignalingType = 'mqtt' | 'livekit' | 'cloudflare';
 
-export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConnectionOptions {
+export interface IPiCameraOptions
+  extends IMqttConnectionOptions, ILiveKitConnectionOptions, IApiConnectionOptions {
   signaling?: SignalingType;
+
+  /**
+   * The uid pi-webrtc was started with (its `--uid` flag) — the device's own id, not a browser
+   * or session id.
+   *
+   * mqtt:       prefixes the signaling topics the device subscribes to.
+   * cloudflare: looked up through `GET /devices/{uid}` to find which SFU session the device is
+   *             currently publishing into.
+   */
+  uid?: string;
+
   stunUrls?: string[];
   turnUrls?: string[];
   turnUsername?: string;
@@ -38,7 +57,7 @@ export interface IPiCameraOptions extends IMqttConnectionOptions, IWebSocketConn
   codec?: CodecType;
 }
 
-export type ActionType = WebsocketActionType | MqttTopicType;
+export type ActionType = LiveKitActionType | MqttTopicType | CloudflareActionType;
 
 export interface IPiCameraEvents {
   /**
@@ -116,10 +135,28 @@ export interface IPiCameraEvents {
   onRecording?: (res: RecordingResponse) => void;
 
   /**
-   * Emitted when the P2P connection cannot be established within the allotted time. 
+   * Emitted when the P2P connection cannot be established within the allotted time.
    * Automatically triggers the `terminate()` function.
    */
   onTimeout?: () => void;
+
+  /**
+   * Emitted when signaling fails for a reason worth putting in front of a user — a device that
+   * has never reported a session, one that is registered but not publishing, a track the SFU
+   * refused. Distinct from `onTimeout`, which only says the peer never came up.
+   *
+   * @param err - What went wrong.
+   */
+  onError?: (err: Error) => void;
+
+  /**
+   * Emitted on the `cloudflare` path once the device's session record has been read, before the
+   * peer is built. Cloudflare mints a new session id on every device reconnect, so this is the
+   * only place the current one is visible.
+   *
+   * @param session - What the device last reported it is publishing into.
+   */
+  onDeviceSession?: (session: DeviceSession) => void;
 
   /**
    * Emitted when the SFU room information changes.
@@ -167,6 +204,15 @@ export interface IPiCamera extends IPiCameraEvents {
    * Retrieves the current connection status.
    */
   getStatus(): RTCPeerConnectionState;
+
+  /**
+   * Pulls whatever the device has started publishing since the connection was established, and
+   * resolves to how many tracks that was. Rejects if the SFU refuses.
+   *
+   * Only the `cloudflare` path has anything to re-read; elsewhere new tracks arrive on their own
+   * and this resolves to `0`.
+   */
+  refresh(): Promise<number>;
 
   /**
   * Retrieves the list of video files.

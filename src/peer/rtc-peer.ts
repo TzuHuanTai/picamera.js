@@ -342,8 +342,22 @@ export class RtcPeer {
     }
   }
 
+  /**
+   * Which remote stream an incoming track belongs to. LiveKit encodes the participant sid in the
+   * stream id; an SFU that hands tracks over without a stream to group them by has to say so
+   * some other way.
+   */
+  protected getStreamKey(event: RTCTrackEvent): string {
+    const streamId = event.streams[0]?.id;
+    if (streamId) {
+      const [sid] = streamId.split('|');
+      return sid;
+    }
+    return event.transceiver.mid ?? event.track.id;
+  }
+
   private handleTrack = (event: RTCTrackEvent) => {
-    const [sid] = event.streams[0].id.split('|');
+    const sid = this.getStreamKey(event);
 
     let remoteStream = this.remoteStreamMap.get(sid);
 
@@ -352,7 +366,10 @@ export class RtcPeer {
       this.remoteStreamMap.set(sid, remoteStream);
     }
 
-    event.streams[0].getTracks().forEach((track) => {
+    // A track can arrive without a stream to group it with, in which case it is the whole payload.
+    const tracks = event.streams[0] ? event.streams[0].getTracks() : [event.track];
+
+    tracks.forEach((track) => {
       remoteStream?.addTrack(track);
       if (track.kind === "audio") {
         track.enabled = this.options.isSpeakerOn ?? false;
