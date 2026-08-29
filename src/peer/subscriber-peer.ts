@@ -1,5 +1,5 @@
 import { DataPacket } from "@livekit/protocol";
-import { ChannelLabel, RtcPeer, RtcPeerConfig } from "./rtc-peer";
+import { ChannelRole, RtcPeer, RtcPeerConfig } from "./rtc-peer";
 
 export class SubscriberPeer extends RtcPeer {
   constructor(config: RtcPeerConfig) {
@@ -7,7 +7,7 @@ export class SubscriberPeer extends RtcPeer {
     console.debug("SubscriberPeer created.");
   }
 
-  override async onDataChannelMessage(label: ChannelLabel, event: MessageEvent): Promise<void> {
+  override async onDataChannelMessage(role: ChannelRole, event: MessageEvent): Promise<void> {
     let buffer: ArrayBuffer;
     if (event.data instanceof ArrayBuffer) {
       buffer = event.data;
@@ -21,7 +21,7 @@ export class SubscriberPeer extends RtcPeer {
     const dp = DataPacket.fromBinary(new Uint8Array(buffer));
 
     if (dp.value?.case === 'user') {
-      super.dispatchPayload(label, dp.value.value.payload);
+      super.dispatchPayload(role, dp.value.value.payload);
     }
   }
 }

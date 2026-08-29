@@ -10,8 +10,8 @@ import {
 } from './signaling/livekit-client';
 import { CloudflareActionType } from './signaling/cloudflare-client';
 import { DeviceSession, IApiConnectionOptions } from './signaling/picamera-api';
-import { ChannelId, IpcMode } from './peer/rtc-peer';
-import { CommandType, QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet';
+import { ChannelRole, IpcMode, RequestType } from './peer/rtc-peer';
+import { QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet';
 import { CameraControlId } from './proto/camera_control';
 import { CameraControlValue } from './constants/camera-property';
 
@@ -51,7 +51,6 @@ export interface IPiCameraOptions
   turnPassword?: string;
   timeout?: number;
   datachannelOnly?: boolean;
-  ipcMode?: IpcMode;
   isMicOn?: boolean;
   isSpeakerOn?: boolean;
   codec?: CodecType;
@@ -70,16 +69,16 @@ export interface IPiCameraEvents {
   /**
    * Emitted when the data channel is successfully opened.
    *
-   * @param dataChannel - The Id of the opened RTCDataChannel.
+   * @param role - Which channel opened.
    */
-  onDatachannel?: (id: ChannelId) => void;
+  onDatachannel?: (role: ChannelRole) => void;
 
   /**
    * If any data transfer by datachannel, the on progress will give the received/total info.
    * @param received 
    * @param total 
    */
-  onProgress?: (received: number, total: number, type: CommandType) => void;
+  onProgress?: (received: number, total: number, type: RequestType, requestId?: string) => void;
 
   /**
    * Attaches the remote media stream to the specified media element for playback.
@@ -252,14 +251,14 @@ export interface IPiCamera extends IPiCameraEvents {
    * 
    * @param msg - The custom contents.
    */
-  sendText(msg: string): void;
+  sendText(msg: string, mode?: IpcMode): void;
 
   /**
    * Send a binary data to the server for IPC.
    * 
    * @param msg - The custom contents.
    */
-  sendData(msg: Uint8Array): void;
+  sendData(msg: Uint8Array, mode?: IpcMode): void;
 
   /**
    * Sends a `START_RECORDING` command to the server.

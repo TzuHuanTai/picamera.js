@@ -98,7 +98,7 @@ export default function App() {
 `datachannelOnly: true` skips the media stream entirely, so nothing is encoded or uploaded until the snapshot is asked for. The image arrives base64-encoded once every packet is in.
 
 ```javascript
-import { ChannelId, PiCamera } from 'picamera.js';
+import { ChannelRole, PiCamera } from 'picamera.js';
 
 const camera = new PiCamera({
   uid: 'your-custom-uid',
@@ -111,8 +111,8 @@ const camera = new PiCamera({
   datachannelOnly: true,
 });
 
-camera.onDatachannel = (id) => {
-  if (id === ChannelId.Command) {
+camera.onDatachannel = (role) => {
+  if (role === ChannelRole.Command) {
     camera.snapshot();
   }
 };
@@ -127,10 +127,10 @@ camera.connect();
 
 ## Send and receive IPC messages
 
-Talks to whatever process the device has on the other end of `--enable-ipc`. `ipcMode: 'reliable'` retransmits until delivered; `'lossy'` gives up sooner for lower latency.
+Talks to whatever process the device has on the other end of `--enable-ipc`. Both IPC channels are open whenever the device runs with that flag, so the mode is picked per message: `sendText(msg, 'reliable')` (the default) retransmits until delivered, `'lossy'` gives up sooner for lower latency.
 
 ```javascript
-import { ChannelId, PiCamera } from 'picamera.js';
+import { ChannelRole, PiCamera } from 'picamera.js';
 
 const camera = new PiCamera({
   uid: 'your-custom-uid',
@@ -141,11 +141,10 @@ const camera = new PiCamera({
   mqttPassword: 'Wonderful',
   stunUrls: ['stun:stun1.l.google.com:19302'],
   datachannelOnly: true,
-  ipcMode: 'reliable',
 });
 
-camera.onDatachannel = (id) => {
-  if (id === ChannelId.Reliable) {
+camera.onDatachannel = (role) => {
+  if (role === ChannelRole.Reliable) {
     camera.sendText('Hello! this is picamera.js!');
   }
 };
@@ -238,7 +237,7 @@ camera.connect();
 Drives the device's on-demand recorder over the command DataChannel, so the device needs `--record-mode=on-demand` (or `both`). Recording runs until you call `stopRecording()` — nothing ends the clip on its own. `onRecording` reports each state change and the file being written.
 
 ```javascript
-import { ChannelId, PiCamera } from 'picamera.js';
+import { ChannelRole, PiCamera } from 'picamera.js';
 
 const camera = new PiCamera({
   uid: 'your-custom-uid',
@@ -251,8 +250,8 @@ const camera = new PiCamera({
   datachannelOnly: true,
 });
 
-camera.onDatachannel = (id) => {
-  if (id === ChannelId.Command) {
+camera.onDatachannel = (role) => {
+  if (role === ChannelRole.Command) {
     camera.startRecording();
 
     // Nothing stops the recorder by itself. Here a 10s timer stands in for whatever ends the
