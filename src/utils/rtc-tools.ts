@@ -100,6 +100,76 @@ export function arrayBufferToBase64(buffer: Uint8Array): string {
   return btoa(arrayBufferToString(buffer));
 }
 
+// One channel for the whole module: yielding happens every few milliseconds on a busy
+// transfer, and a fresh MessageChannel per yield would be pure garbage.
+let yieldPort: MessagePort | undefined;
+const yieldWaiters: Array<() => void> = [];
+
+/**
+ * Hand control back to the event loop, without setTimeout's nested-timer clamping.
+ *
+ * One waiter is released per message, so two callers yielding at the same time resume in
+ * separate tasks. Releasing them together would let their time slices add up into one long
+ * task, which is the opposite of what yielding is for.
+ */
+export function yieldToEventLoop(): Promise<void> {
+  if (typeof MessageChannel === 'undefined') {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  if (!yieldPort) {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => yieldWaiters.shift()?.();
+    yieldPort = channel.port2;
+    // A live port keeps a Node process from exiting; browsers have no unref.
+    (channel.port1 as MessagePort & { unref?: () => void }).unref?.();
+    (yieldPort as MessagePort & { unref?: () => void }).unref?.();
+  }
+
+  return new Promise((resolve) => {
+    yieldWaiters.push(resolve);
+    yieldPort!.postMessage(null);
+  });
+}
+
 export const padZero = (num: number): string => {
   return num.toString().padStart(2, '0');
+}
+
+/**
+ * A correlation id for a request, or a stream id for a chunked body. `crypto.randomUUID()` needs a
+ * secure context and is missing from some React Native runtimes, hence the fallbacks.
+ */
+export function generateRequestId(): string {
+  const webCrypto: Crypto | undefined = globalThis.crypto;
+
+  if (typeof webCrypto?.randomUUID === 'function') {
+    return webCrypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (typeof webCrypto?.getRandomValues === 'function') {
+    webCrypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+
+  // Version 4 and variant bits, so the result is a well-formed UUID either way.
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex: string[] = [];
+  for (let i = 0; i < bytes.length; i++) {
+    hex.push(bytes[i].toString(16).padStart(2, '0'));
+  }
+
+  return (
+    hex.slice(0, 4).join('') + '-' +
+    hex.slice(4, 6).join('') + '-' +
+    hex.slice(6, 8).join('') + '-' +
+    hex.slice(8, 10).join('') + '-' +
+    hex.slice(10, 16).join('')
+  );
 }

@@ -5,24 +5,24 @@ import { IPiCamera, IPiCameraOptions } from './pi-camera.types';
 import { LiveKitClient, Participant, Quality, RoomInfo, Speaking } from './signaling/livekit-client';
 import { CloudflareClient } from './signaling/cloudflare-client';
 import { DeviceSession } from './signaling/picamera-api';
-import { ChannelId, RtcPeerConfig } from './peer/rtc-peer';
+import { ChannelRole, IpcMode, RequestType, RtcPeerConfig } from './peer/rtc-peer';
 import { CommanderPeer } from './peer/commander-peer';
 import { SubscriberPeer } from './peer/subscriber-peer';
 import { PublisherPeer } from './peer/publisher-peer';
 import { CloudflarePeer } from './peer/cloudflare-peer';
 import { DEFAULT } from './constants';
-import { CommandType, QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet';
+import { QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet';
 import { CameraControlId } from './proto/camera_control';
 import { CameraControlValue } from './constants/camera-property';
 
 export class PiCamera implements IPiCamera {
   onConnectionState?: (state: RTCPeerConnectionState) => void;
-  onDatachannel?: (id: ChannelId) => void;
+  onDatachannel?: (role: ChannelRole) => void;
   onSnapshot?: (base64: string) => void;
   onStream?: (stream: MediaStream) => void;
   onSfuStream?: (sid: string, stream: MediaStream) => void;
   onVideoListLoaded?: (res: QueryFileResponse) => void;
-  onProgress?: (received: number, total: number, type: CommandType) => void;
+  onProgress?: (received: number, total: number, type: RequestType, requestId?: string) => void;
   onVideoDownloaded?: (file: Uint8Array) => void;
   onMessage?: (data: Uint8Array) => void;
   onRecording?: (res: RecordingResponse) => void;
@@ -125,14 +125,14 @@ export class PiCamera implements IPiCamera {
     this.cmdPeer?.snapshot(quality);
   }
 
-  sendText = (msg: string) => {
-    this.cmdPeer?.sendText(msg);
-    this.pubPeer?.sendText(msg);
+  sendText = (msg: string, mode: IpcMode = 'reliable') => {
+    this.cmdPeer?.sendText(msg, mode);
+    this.pubPeer?.sendText(msg, mode);
   }
 
-  sendData = (data: Uint8Array) => {
-    this.cmdPeer?.sendData(data);
-    this.pubPeer?.sendData(data);
+  sendData = (data: Uint8Array, mode: IpcMode = 'reliable') => {
+    this.cmdPeer?.sendData(data, mode);
+    this.pubPeer?.sendData(data, mode);
   }
 
   startRecording = () => {
@@ -207,7 +207,7 @@ export class PiCamera implements IPiCamera {
 
     this.cmdPeer.onSnapshot = (base64) => this.onSnapshot?.(base64);
     this.cmdPeer.onVideoListLoaded = (res) => this.onVideoListLoaded?.(res);
-    this.cmdPeer.onProgress = (received, total, type) => this.onProgress?.(received, total, type);
+    this.cmdPeer.onProgress = (received, total, type, requestId) => this.onProgress?.(received, total, type, requestId);
     this.cmdPeer.onVideoDownloaded = (file) => this.onVideoDownloaded?.(file);
     this.cmdPeer.onDatachannel = (id) => this.onDatachannel?.(id);
     this.cmdPeer.onMessage = (data) => this.onMessage?.(data);

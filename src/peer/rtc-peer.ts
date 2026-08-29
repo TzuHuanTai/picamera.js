@@ -1,47 +1,118 @@
 import { IPiCameraOptions } from "../pi-camera.types";
-import { CommandType, Packet, QueryFileResponse, RecordingResponse } from "../proto/packet";
-import { DataChannelReceiver } from "../rtc/datachannel-receiver";
-import { arrayBufferToBase64 } from "../utils/rtc-tools";
+import { Packet, QueryFileResponse, RecordingResponse, Request } from "../proto/packet";
+import { StreamAssembler, StreamResult } from "../rtc/datachannel-receiver";
+import { arrayBufferToBase64, generateRequestId, yieldToEventLoop } from "../utils/rtc-tools";
 
-export type ChannelLabel = 'command' | '_lossy' | '_reliable';
+export type ChannelLabel = 'command' | 'stream' | '_lossy' | '_reliable';
 
-export enum ChannelId {
+/**
+ * What a channel is *for*. A direct peer (MQTT, WHEP) negotiates all four out-of-band on the ids
+ * in `RoleIdMap`, so `ondatachannel` never fires; over LiveKit the SFU opens its own by label.
+ */
+export enum ChannelRole {
   Command,
+  Stream,
   Lossy,
   Reliable
 };
 
-export const ChannelLabelMap: Record<ChannelId, ChannelLabel> = {
-  [ChannelId.Command]: 'command',
-  [ChannelId.Lossy]: '_lossy',
-  [ChannelId.Reliable]: '_reliable'
+export const RoleLabelMap: Record<ChannelRole, ChannelLabel> = {
+  [ChannelRole.Command]: 'command',
+  [ChannelRole.Stream]: 'stream',
+  [ChannelRole.Lossy]: '_lossy',
+  [ChannelRole.Reliable]: '_reliable'
 };
 
-export const LabelToChannelIdMap: Record<ChannelLabel, ChannelId> = {
-  'command': ChannelId.Command,
-  '_lossy': ChannelId.Lossy,
-  '_reliable': ChannelId.Reliable
+export const LabelToRoleMap: Record<ChannelLabel, ChannelRole> = {
+  'command': ChannelRole.Command,
+  'stream': ChannelRole.Stream,
+  '_lossy': ChannelRole.Lossy,
+  '_reliable': ChannelRole.Reliable
 };
 
+/** Must match the device's `RoleId`. */
+export const RoleIdMap: Record<ChannelRole, number> = {
+  [ChannelRole.Command]: 0,
+  [ChannelRole.Stream]: 1,
+  [ChannelRole.Lossy]: 2,
+  [ChannelRole.Reliable]: 3
+};
+
+/** Must match the device's `RoleInit`. */
+export function roleInit(role: ChannelRole): RTCDataChannelInit {
+  switch (role) {
+    case ChannelRole.Command:
+    case ChannelRole.Reliable:
+      return { ordered: true };
+    case ChannelRole.Stream:
+      return { ordered: false };
+    case ChannelRole.Lossy:
+      return { ordered: false, maxRetransmits: 0 };
+  }
+}
+
+/**
+ * Which arm of `Request.payload` is set — the device's `Request::PayloadCase`. protoc generates
+ * that enum for C++; ts-proto generates no equivalent, so it is named here. The values are the
+ * generated field names, which is what lets `requestCase` read one straight off a message.
+ */
+export enum RequestType {
+  Disconnect = 'disconnect',
+  ControlCamera = 'controlCamera',
+  TakeSnapshot = 'takeSnapshot',
+  QueryFile = 'queryFile',
+  TransferFile = 'transferFile',
+  ToggleTracking = 'toggleTracking',
+  StartRecording = 'startRecording',
+  StopRecording = 'stopRecording',
+  /** Not an arm of the oneof: an unprompted IPC payload. */
+  Ipc = 'ipc'
+}
+
+type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+
+/** Fails to compile if the proto gains, drops or renames a request arm. */
+const _coversEveryRequestArm: Exact<Exclude<`${RequestType}`, 'ipc'>, keyof Request> = true;
+void _coversEveryRequestArm;
+
+/**
+ * The arm that is set, equivalent to `Request::payload_case()` on the device. Undefined unless
+ * exactly one is: ts-proto renders a oneof as plain optional fields, so nothing stops a caller
+ * setting two, and both would go on the wire for the device to resolve as it saw fit.
+ */
+export function requestCase(request: Request): RequestType | undefined {
+  const set = (Object.keys(request) as (keyof Request)[])
+    .filter((name) => request[name] !== undefined);
+
+  if (set.length > 1) {
+    console.warn(`Request has more than one payload set: ${set.join(', ')}.`);
+    return undefined;
+  }
+  return set[0] as RequestType | undefined;
+}
+
+/** Which IPC channel a message goes out on. Per message, not a connection-time setting. */
 export type IpcMode = 'lossy' | 'reliable';
+
+export function ipcModeToRole(mode: IpcMode): ChannelRole {
+  return mode === 'lossy' ? ChannelRole.Lossy : ChannelRole.Reliable;
+}
 
 export interface RtcPeerConfig extends RTCConfiguration {
   options: IPiCameraOptions;
 }
 
-interface ChannelReceiverGroup {
-  snapshotReceiver: DataChannelReceiver;
-  queryFileReceiver: DataChannelReceiver;
-  fileReceiver: DataChannelReceiver;
-  customReceiver: DataChannelReceiver;
+interface PendingRequest {
+  type: RequestType;
+  createdAt: number;
 }
 
 export class RtcPeer {
   onSnapshot?: (base64: string) => void;
   onVideoListLoaded?: (res: QueryFileResponse) => void;
-  onProgress?: (received: number, total: number, type: CommandType) => void;
+  onProgress?: (received: number, total: number, type: RequestType, requestId?: string) => void;
   onVideoDownloaded?: (file: Uint8Array) => void;
-  onDatachannel?: (id: ChannelId) => void;
+  onDatachannel?: (role: ChannelRole) => void;
   onMessage?: (data: Uint8Array) => void;
   onRecording?: (res: RecordingResponse) => void;
   onStream?: (stream: MediaStream) => void;
@@ -54,14 +125,18 @@ export class RtcPeer {
 
   readonly options: IPiCameraOptions;
   protected peer: RTCPeerConnection;
+  protected channels: Partial<Record<ChannelRole, RTCDataChannel>> = {};
   private localStream?: MediaStream;
   private remoteStreamMap: Map<string, MediaStream> = new Map();
   private pendingIceCandidates: RTCIceCandidateInit[] = [];
-  private channelReceivers: Record<ChannelLabel, ChannelReceiverGroup> = {} as Record<ChannelLabel, ChannelReceiverGroup>;
-  private messageQueue: Array<{ label: ChannelLabel; buffer: ArrayBuffer }> = [];
+  private assemblers: Partial<Record<ChannelRole, StreamAssembler>> = {};
+  private messageQueue: Array<{ role: ChannelRole; buffer: ArrayBuffer }> = [];
   private messageQueueHead = 0;
   private isProcessingQueue = false;
-  private yieldChannel: MessageChannel | null = null;
+
+  private pendingRequests: Map<string, PendingRequest> = new Map();
+  private readonly MAX_PENDING_REQUESTS = 256;
+  private readonly PENDING_REQUEST_TTL_MS = 5 * 60 * 1000;
 
   private readonly MAX_ICE_RESTART_ATTEMPTS = 3;
   private readonly DISCONNECT_RESTART_DELAY_MS = 3000;
@@ -71,11 +146,6 @@ export class RtcPeer {
   private disconnectTimer?: ReturnType<typeof setTimeout>;
   private iceRestartTimer?: ReturnType<typeof setTimeout>;
   private negotiationReady = false;
-
-  // @ts-ignore noUnusedLocals
-  private lossyChannel?: RTCDataChannel;
-  private reliableChannel?: RTCDataChannel;
-  // @ts-ignore noUnusedLocals
 
   constructor(config: RtcPeerConfig) {
     this.options = config.options;
@@ -111,26 +181,15 @@ export class RtcPeer {
       }
     }
 
-
-    this.peer.ondatachannel = (dc) => {
-      const channel = dc.channel;
-      const label = channel.label as ChannelLabel;
-      const channelId = LabelToChannelIdMap[label];
-
-      if (
-        (channelId === ChannelId.Lossy && config.options.ipcMode === 'lossy') ||
-        (channelId === ChannelId.Reliable && config.options.ipcMode === 'reliable')
-      ) {
-        if (channelId === ChannelId.Lossy) {
-          this.lossyChannel = channel;
-        } else if (channelId === ChannelId.Reliable) {
-          this.reliableChannel = channel;
-        }
-
-        channel.binaryType = "arraybuffer";
-        this.createReceivers(label);
-        channel.onmessage = (e) => this.onDataChannelMessage(label, e);
+    // Only LiveKit opens channels in-band; a negotiated channel never raises this.
+    this.peer.ondatachannel = (ev) => {
+      const channel = ev.channel;
+      const role = LabelToRoleMap[channel.label as ChannelLabel];
+      if (role === undefined) {
+        console.debug(`Ignoring data channel with unknown label: ${channel.label}`);
+        return;
       }
+      this.adoptChannel(role, channel);
     }
 
     this.peer.onnegotiationneeded = async () => {
@@ -153,10 +212,6 @@ export class RtcPeer {
       }
     };
 
-    if (typeof MessageChannel !== 'undefined') {
-      this.yieldChannel = new MessageChannel();
-      this.yieldChannel.port1.onmessage = () => this.drainQueue();
-    }
   }
 
   get connectionState() {
@@ -164,23 +219,21 @@ export class RtcPeer {
   }
 
   close() {
-    for (const label in this.channelReceivers) {
-      const group = this.channelReceivers[label as ChannelLabel];
-      group.snapshotReceiver.reset();
-      group.queryFileReceiver.reset();
-      group.fileReceiver.reset();
-      group.customReceiver.reset();
+    for (const key of Object.keys(this.assemblers)) {
+      this.assemblers[Number(key) as ChannelRole]?.reset();
     }
-    this.channelReceivers = {} as Record<ChannelLabel, ChannelReceiverGroup>;
+    this.assemblers = {};
 
-    if (this.lossyChannel) {
-      this.lossyChannel.onmessage = null;
+    for (const key of Object.keys(this.channels)) {
+      const channel = this.channels[Number(key) as ChannelRole];
+      if (channel) {
+        channel.onmessage = null;
+        channel.onopen = null;
+        channel.close();
+      }
     }
-    if (this.reliableChannel) {
-      this.reliableChannel.onmessage = null;
-    }
-    this.lossyChannel = undefined;
-    this.reliableChannel = undefined;
+    this.channels = {};
+    this.pendingRequests.clear();
 
     this.localStream?.getTracks().forEach(track => {
       track.stop();
@@ -198,6 +251,7 @@ export class RtcPeer {
     this.peer.ontrack = null;
     this.peer.onicecandidate = null;
     this.peer.onconnectionstatechange = null;
+    this.peer.ondatachannel = null;
 
     this.clearDisconnectTimer();
     this.clearIceRestartTimer();
@@ -219,14 +273,101 @@ export class RtcPeer {
     this.messageQueue = [];
     this.messageQueueHead = 0;
     this.isProcessingQueue = false;
-    this.yieldChannel?.port1.close();
-    this.yieldChannel?.port2.close();
-    this.yieldChannel = null;
     console.debug("webrtc peer is closed.");
   }
 
-  createDataChannel(id: ChannelId, options?: RTCDataChannelInit) {
-    return this.peer.createDataChannel(ChannelLabelMap[id], options);
+  /** Open an out-of-band channel. Both sides create it locally on the same id. */
+  protected createNegotiatedChannel(role: ChannelRole): RTCDataChannel {
+    const channel = this.peer.createDataChannel(RoleLabelMap[role], {
+      ...roleInit(role),
+      negotiated: true,
+      id: RoleIdMap[role]
+    });
+    this.adoptChannel(role, channel);
+    return channel;
+  }
+
+  /** Open a channel in-band, for backends that negotiate through the SDP. */
+  createDataChannel(role: ChannelRole, options?: RTCDataChannelInit) {
+    return this.peer.createDataChannel(RoleLabelMap[role], options);
+  }
+
+  /**
+   * Take ownership of a channel and announce it once usable. One handed over by `ondatachannel`
+   * can already be open, so this cannot rely on `onopen` alone.
+   */
+  protected registerChannel(role: ChannelRole, channel: RTCDataChannel): void {
+    channel.binaryType = "arraybuffer";
+    this.channels[role] = channel;
+
+    if (channel.readyState === 'open') {
+      this.onDatachannel?.(role);
+    } else {
+      channel.onopen = () => this.onDatachannel?.(role);
+    }
+  }
+
+  /** Register a channel and start reading from it. */
+  protected adoptChannel(role: ChannelRole, channel: RTCDataChannel): void {
+    this.registerChannel(role, channel);
+    this.createReceivers(role);
+    channel.onmessage = (e) => this.onDataChannelMessage(role, e);
+  }
+
+  protected channel(role: ChannelRole): RTCDataChannel | undefined {
+    return this.channels[role];
+  }
+
+  protected isChannelOpen(role: ChannelRole): boolean {
+    return this.channels[role]?.readyState === 'open';
+  }
+
+  /** False if the channel is not open. */
+  protected sendOn(role: ChannelRole, data: Uint8Array<ArrayBuffer>): boolean {
+    const channel = this.channels[role];
+    if (channel?.readyState !== 'open') {
+      console.warn(`Cannot send on '${RoleLabelMap[role]}': channel is not open.`);
+      return false;
+    }
+    channel.send(data);
+    return true;
+  }
+
+  /**
+   * Record an outgoing request so its answer can be recognised. Nothing on a stream says what its
+   * body is, so this map is what decides how a completed body is parsed.
+   */
+  protected trackRequest(type: RequestType): string {
+    this.prunePendingRequests();
+    const requestId = generateRequestId();
+    this.pendingRequests.set(requestId, { type, createdAt: Date.now() });
+    return requestId;
+  }
+
+  protected retireRequest(requestId: string): RequestType | undefined {
+    if (!requestId) {
+      return undefined;
+    }
+    const pending = this.pendingRequests.get(requestId);
+    this.pendingRequests.delete(requestId);
+    return pending?.type;
+  }
+
+  /** Answers that never arrive would otherwise sit here for the life of the connection. */
+  private prunePendingRequests(): void {
+    const cutoff = Date.now() - this.PENDING_REQUEST_TTL_MS;
+    for (const [id, request] of this.pendingRequests) {
+      if (request.createdAt < cutoff) {
+        this.pendingRequests.delete(id);
+      }
+    }
+    while (this.pendingRequests.size >= this.MAX_PENDING_REQUESTS) {
+      const oldest = this.pendingRequests.keys().next();
+      if (oldest.done) {
+        break;
+      }
+      this.pendingRequests.delete(oldest.value);
+    }
   }
 
   createOffer = async (options?: RTCOfferOptions) => {
@@ -343,9 +484,8 @@ export class RtcPeer {
   }
 
   /**
-   * Which remote stream an incoming track belongs to. LiveKit encodes the participant sid in the
-   * stream id; an SFU that hands tracks over without a stream to group them by has to say so
-   * some other way.
+   * Which remote stream a track belongs to. LiveKit puts the participant sid in the stream id; an
+   * SFU that hands tracks over ungrouped has to say so some other way.
    */
   protected getStreamKey(event: RTCTrackEvent): string {
     const streamId = event.streams[0]?.id;
@@ -366,7 +506,7 @@ export class RtcPeer {
       this.remoteStreamMap.set(sid, remoteStream);
     }
 
-    // A track can arrive without a stream to group it with, in which case it is the whole payload.
+    // A track can arrive ungrouped, in which case it is the whole payload.
     const tracks = event.streams[0] ? event.streams[0].getTracks() : [event.track];
 
     tracks.forEach((track) => {
@@ -382,92 +522,141 @@ export class RtcPeer {
     this.onSfuStream?.(sid, remoteStream);
   }
 
-  protected createReceivers(label: ChannelLabel): void {
-
-    this.channelReceivers[label] = {
-      snapshotReceiver: new DataChannelReceiver({
-        onProgress: (received, total) => this.onProgress?.(received, total, CommandType.TAKE_SNAPSHOT),
-        onComplete: (body) => this.onSnapshot?.("data:image/jpeg;base64," + arrayBufferToBase64(body))
-      }),
-      queryFileReceiver: new DataChannelReceiver({
-        onProgress: (received, total) => this.onProgress?.(received, total, CommandType.QUERY_FILE),
-        onComplete: (body) => {
-          const decoded = QueryFileResponse.decode(body);
-          this.onVideoListLoaded?.(decoded);
-        }
-      }),
-      fileReceiver: new DataChannelReceiver({
-        onProgress: (received, total) => this.onProgress?.(received, total, CommandType.TRANSFER_FILE),
-        onComplete: (body) => this.onVideoDownloaded?.(body)
-      }),
-      customReceiver: new DataChannelReceiver({
-        onProgress: (received, total) => this.onProgress?.(received, total, CommandType.CUSTOM),
-        onComplete: (body) => this.onMessage?.(body)
-      }),
-    };
-  };
-
-  private scheduleYield(): void {
-    if (this.yieldChannel) {
-      this.yieldChannel.port2.postMessage(null);
-    } else {
-      setTimeout(() => this.drainQueue(), 0);
-    }
-  }
-
-  protected onDataChannelMessage(label: ChannelLabel, event: MessageEvent): void {
-    this.messageQueue.push({ label, buffer: event.data as ArrayBuffer });
-    if (!this.isProcessingQueue) {
-      this.isProcessingQueue = true;
-      this.scheduleYield();
-    }
-  }
-
-  private drainQueue(): void {
-    const deadline = performance.now() + 5; // 5 ms budget per slice
-    const queue = this.messageQueue;
-    while (this.messageQueueHead < queue.length) {
-      const { label, buffer } = queue[this.messageQueueHead++];
-      this.dispatchPayload(label, new Uint8Array(buffer));
-      if (performance.now() >= deadline) {
-        this.scheduleYield(); // yield, resume on next task
-        return;
-      }
-    }
-    // Fully drained — compact to release references and reset head
-    this.messageQueue = [];
-    this.messageQueueHead = 0;
-    this.isProcessingQueue = false;
-  }
-
-  protected dispatchPayload(label: ChannelLabel, data: Uint8Array) {
-    const packet = Packet.decode(data);
-
-    const receivers = this.channelReceivers[label];
-    if (!receivers) {
-      console.warn(`No receivers found for label: ${label}`);
+  /** Only roles carrying chunked bodies get an assembler; `command` responses are read inline. */
+  protected createReceivers(role: ChannelRole): void {
+    if (role === ChannelRole.Command) {
       return;
     }
 
-    switch (packet.type) {
-      case CommandType.TAKE_SNAPSHOT:
-        receivers.snapshotReceiver.receiveData(packet);
-        break;
-      case CommandType.QUERY_FILE:
-        receivers.queryFileReceiver.receiveData(packet);
-        break;
-      case CommandType.TRANSFER_FILE:
-        receivers.fileReceiver.receiveData(packet);
-        break;
-      case CommandType.CUSTOM:
-        receivers.customReceiver.receiveData(packet);
-        break;
-      case CommandType.START_RECORDING:
-      case CommandType.STOP_RECORDING:
-        if (packet.recordingResponse) {
-          this.onRecording?.(packet.recordingResponse);
+    const isIpc = role === ChannelRole.Lossy || role === ChannelRole.Reliable;
+
+    this.assemblers[role] = new StreamAssembler({
+      onProgress: (received, total, requestId) => {
+        const type = isIpc ? RequestType.Ipc : this.pendingRequests.get(requestId)?.type;
+        if (type !== undefined) {
+          this.onProgress?.(received, total, type, requestId || undefined);
         }
+      },
+      onComplete: (result) => this.handleStreamComplete(role, result),
+      onAbort: (_streamId, _reason, requestId) => this.retireRequest(requestId),
+    });
+  };
+
+  /**
+   * Route a reassembled body by the request it answers, falling back to the device's mime type
+   * hint if that request has already been retired.
+   */
+  private handleStreamComplete(role: ChannelRole, result: StreamResult): void {
+    if (role === ChannelRole.Lossy || role === ChannelRole.Reliable) {
+      this.onMessage?.(result.body);
+      return;
+    }
+
+    const type = this.retireRequest(result.requestId) ?? this.typeFromMimeType(result.mimeType);
+
+    switch (type) {
+      case RequestType.TakeSnapshot: {
+        const mime = result.mimeType || "image/jpeg";
+        this.onSnapshot?.(`data:${mime};base64,` + arrayBufferToBase64(result.body));
         break;
+      }
+      case RequestType.QueryFile:
+        this.onVideoListLoaded?.(QueryFileResponse.decode(result.body));
+        break;
+      case RequestType.TransferFile:
+        this.onVideoDownloaded?.(result.body);
+        break;
+      default:
+        console.warn(
+          `Stream ${result.streamId} answers an unknown request ` +
+          `(request_id "${result.requestId}", mime "${result.mimeType}"); dropping ${result.body.length} bytes.`
+        );
+    }
+  }
+
+  /** Last resort when a stream outlives its pending entry. */
+  private typeFromMimeType(mimeType: string): RequestType | undefined {
+    switch (mimeType) {
+      case "image/jpeg":
+        return RequestType.TakeSnapshot;
+      case "application/x-protobuf":
+        return RequestType.QueryFile;
+      case "application/octet-stream":
+        return RequestType.TransferFile;
+      default:
+        return undefined;
+    }
+  }
+
+  protected onDataChannelMessage(role: ChannelRole, event: MessageEvent): void {
+    this.messageQueue.push({ role, buffer: event.data as ArrayBuffer });
+    if (!this.isProcessingQueue) {
+      this.isProcessingQueue = true;
+      this.drainQueue().catch((err) => console.error("Inbound queue failed:", err));
+    }
+  }
+
+  private async drainQueue(): Promise<void> {
+    try {
+      await yieldToEventLoop();
+
+      let deadline = performance.now() + 5; // 5 ms budget per slice
+      while (this.messageQueueHead < this.messageQueue.length) {
+        const { role, buffer } = this.messageQueue[this.messageQueueHead++];
+
+        try {
+          this.dispatchPayload(role, new Uint8Array(buffer));
+        } catch (err) {
+          console.error("Failed to handle an inbound packet:", err);
+        }
+
+        if (performance.now() >= deadline) {
+          await yieldToEventLoop();
+          deadline = performance.now() + 5;
+        }
+      }
+    } finally {
+      this.messageQueue = [];
+      this.messageQueueHead = 0;
+      this.isProcessingQueue = false;
+    }
+  }
+
+  protected dispatchPayload(role: ChannelRole, data: Uint8Array) {
+    const packet = Packet.decode(data);
+
+    switch (role) {
+      case ChannelRole.Command:
+        this.dispatchResponse(packet);
+        return;
+
+      case ChannelRole.Stream:
+        this.assemblers[role]?.receive(packet);
+        return;
+
+      case ChannelRole.Lossy:
+      case ChannelRole.Reliable:
+        // A raw body fitted in one message; a larger one arrives as a stream on this channel.
+        if (packet.raw !== undefined) {
+          this.onMessage?.(packet.raw);
+        } else {
+          this.assemblers[role]?.receive(packet);
+        }
+        return;
+    }
+  }
+
+  private dispatchResponse(packet: Packet): void {
+    this.retireRequest(packet.requestId);
+
+    const response = packet.response;
+    if (!response) {
+      console.debug("Ignoring a non-response packet on the command channel.");
+      return;
+    }
+
+    if (response.recording) {
+      this.onRecording?.(response.recording);
     }
   }
 }

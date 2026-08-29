@@ -1,5 +1,6 @@
 # API Documentation
 
+* [Data channels](#data-channels)
 * [Options](#options)
 * [Events](#events)
   * [onConnectionState](#onConnectionState)
@@ -35,6 +36,37 @@
   * [toggleMic](#toggleMic)
   * [toggleSpeaker](#toggleSpeaker)
 
+## Data channels
+
+Four channels, each with one job. `onDatachannel` reports each one as a `ChannelRole`.
+
+| Role | Label | SCTP id | Ordered | Reliability | Carries |
+| --- | --- | --- | --- | --- | --- |
+| `ChannelRole.Command` | `command` | 0 | yes | reliable | Requests, and small responses such as `onRecording` |
+| `ChannelRole.Stream` | `stream` | 1 | **no** | reliable | Everything chunked: snapshots, video lists, file transfers |
+| `ChannelRole.Lossy` | `_lossy` | 2 | no | may drop | IPC, UDP-like |
+| `ChannelRole.Reliable` | `_reliable` | 3 | yes | reliable | IPC, TCP-like |
+
+On the `mqtt` path the four are **negotiated out-of-band** on those fixed SCTP ids: both sides
+open them locally, so `ondatachannel` never fires and the ids have to match the device's. Over
+`livekit` the SFU opens its own reserved channels in-band instead, and only `_lossy` / `_reliable`
+exist there. The `cloudflare` path has no data channels at all.
+
+Because a negotiated channel opens as soon as the SCTP association is up, whether or not the
+device opened its side, `onDatachannel` fires for all four on the `mqtt` path even when the device
+is running without `--enable-ipc`. It reports that the channel is usable locally, not that anything
+is listening on the other end.
+
+Splitting bulk content onto its own channel is what keeps a multi-megabyte `downloadVideoFile()`
+from blocking the commands issued while it runs — a snapshot requested mid-transfer comes back
+without waiting for the file. Because `stream` is unordered and several streams are in flight at
+once, every request carries a `request_id` that the device echoes on the matching answer.
+
+Nothing on a stream says what its body is: `request_id` names the request it answers, and the
+channel it arrived on says whether it is an answer at all or an IPC payload. The client keeps the
+pending-request map that turns one into the other, so `onProgress` can report overlapping
+transfers separately and each completed body is parsed as what was actually asked for.
+
 ## Options
 
 Available flags for initialization.
@@ -61,7 +93,6 @@ Available flags for initialization.
 | turnPassword    | `string`   |         | The password for the TURN server.                            |
 | timeout         | `number`   | `10000` | The connection timeout in milliseconds (`ms`).               |
 | datachannelOnly | `boolean`  | `false` | Specifies that the connection is only for data transfer, without media streams. |
-| ipcMode         | `string`  |          | Defines the communication mode for the IPC data channel. Accepts `lossy` (UDP-like) or `reliable` (TCP-like) modes. |
 | isMicOn         | `boolean`  | `true`  | Enables the local microphone stream by default if the connection is established. |
 | isSpeakerOn     | `boolean`  | `true`  | Enables the remote audio stream by default if the connection is established. |
 | codec           | `string`   |         | Codecs include `H264`, `VP8`, `VP9`, and `AV1`.              |
@@ -75,15 +106,15 @@ Available flags for initialization.
 
 - ### onDatachannel
 
-  `= (id: ChannelId) => {}`
+  `= (role: ChannelRole) => {}`
 
   Emitted when the data channel successfully opens for data communication.
 
 - ### onProgress
 
-  `= (received: number, total: number, type: CommandType) => {}`
+  `= (received: number, total: number, type: RequestType, requestId?: string) => {}`
 
-  Emitted during DataChannel transfers with received/total progress.
+  Emitted during DataChannel transfers with received/total progress. `requestId` says which request the bytes belong to, so overlapping transfers can be told apart.
 
 - ### onStream
 
@@ -249,13 +280,13 @@ Available flags for initialization.
 
 - ### sendText
 
-  `.sendText(msg: string)`
+  `.sendText(msg: string, mode?: 'lossy' | 'reliable')`
   
-  If `ipcMode` is set to `reliable`, the message will be retransmitted until successfully delivered. If set to `lossy`, the message may be lost, but with lower latency.
+  Sends an IPC message. `mode` is chosen per message and defaults to `reliable`, which retransmits until delivered; `lossy` may drop the message but has lower latency. Both channels are open whenever the device runs with `--enable-ipc`. Payloads over 64 KB are chunked and are only accepted on `reliable`.
 
 - ### sendData
 
-  `.sendData(binary: Uint8Array)`
+  `.sendData(binary: Uint8Array, mode?: 'lossy' | 'reliable')`
   
   Same as `sendText`, but sends in binary format.
 
