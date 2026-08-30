@@ -247,15 +247,15 @@ export interface IPiCamera extends IPiCameraEvents {
   snapshot(quality?: number): void;
 
   /**
-   * Send a message to the server for IPC.
-   * 
+   * Send a message to the device's IPC socket.
+   *
    * @param msg - The custom contents.
    */
   sendText(msg: string, mode?: IpcMode): void;
 
   /**
-   * Send a binary data to the server for IPC.
-   * 
+   * Send binary data to the device's IPC socket.
+   *
    * @param msg - The custom contents.
    */
   sendData(msg: Uint8Array, mode?: IpcMode): void;

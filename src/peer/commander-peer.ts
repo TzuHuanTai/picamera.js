@@ -11,6 +11,8 @@ import { generateRequestId, padZero, yieldToEventLoop } from "../utils/rtc-tools
 import {
   ChannelRole,
   IpcMode,
+  IpcOptions,
+  ipcBody,
   ipcModeToRole,
   requestCase,
   RoleLabelMap,
@@ -158,10 +160,15 @@ export class CommanderPeer extends RtcPeer {
   }
 
   sendData = (binary: Uint8Array, mode: IpcMode = 'reliable') => {
+    this.sendToEndpoint(binary, mode);
+  }
+
+  /** @internal Addressed send, for the package that owns the endpoint. */
+  sendToEndpoint = (binary: Uint8Array, mode: IpcMode = 'reliable', options?: IpcOptions) => {
     const role = ipcModeToRole(mode);
 
     if (binary.length <= IPC_FLAT_LIMIT) {
-      this.sendOn(role, Packet.encode(Packet.create({ raw: binary })).finish());
+      this.sendOn(role, Packet.encode(Packet.create(ipcBody(binary, options))).finish());
       return;
     }
 
@@ -171,6 +178,15 @@ export class CommanderPeer extends RtcPeer {
       console.warn(
         `Refusing to send ${binary.length} bytes on the lossy IPC channel; ` +
         `payloads over ${IPC_FLAT_LIMIT} bytes must use 'reliable'.`
+      );
+      return;
+    }
+
+    if (options?.endpoint) {
+      console.warn(
+        `Refusing to send ${binary.length} bytes to the '${options.endpoint}' IPC endpoint; ` +
+        `payloads over ${IPC_FLAT_LIMIT} bytes are chunked, and a chunked body can only ` +
+        `reach the default endpoint.`
       );
       return;
     }
