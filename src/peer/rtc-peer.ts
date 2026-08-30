@@ -98,6 +98,28 @@ export function ipcModeToRole(mode: IpcMode): ChannelRole {
   return mode === 'lossy' ? ChannelRole.Lossy : ChannelRole.Reliable;
 }
 
+/**
+ * @internal Addressing for `sendToEndpoint`.
+ */
+export interface IpcOptions {
+  /** Endpoint name. `''` is the device's default socket; `'gamepad'` is operator input. */
+  endpoint?: string;
+  sequence?: number;
+}
+
+/** `Ipc` carries an endpoint; without options this is `raw`, which reaches the default socket. */
+export function ipcBody(binary: Uint8Array, options?: IpcOptions) {
+  return options
+    ? {
+      ipc: {
+        endpoint: options.endpoint ?? '',
+        sequence: options.sequence ?? 0,
+        payload: binary,
+      }
+    }
+    : { raw: binary };
+}
+
 export interface RtcPeerConfig extends RTCConfiguration {
   options: IPiCameraOptions;
 }

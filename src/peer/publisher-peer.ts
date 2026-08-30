@@ -1,5 +1,14 @@
 import { DataPacket_Kind, UserPacket, DataPacket } from '@livekit/protocol';
-import { ChannelRole, IpcMode, ipcModeToRole, roleInit, RtcPeer, RtcPeerConfig } from "./rtc-peer";
+import {
+  ChannelRole,
+  IpcMode,
+  IpcOptions,
+  ipcBody,
+  ipcModeToRole,
+  roleInit,
+  RtcPeer,
+  RtcPeerConfig,
+} from "./rtc-peer";
 import { Packet } from '../proto/packet';
 
 export class PublisherPeer extends RtcPeer {
@@ -26,7 +35,12 @@ export class PublisherPeer extends RtcPeer {
   }
 
   sendData = (binary: Uint8Array, mode: IpcMode = 'reliable') => {
-    const data = Packet.encode(Packet.create({ raw: binary })).finish();
+    this.sendToEndpoint(binary, mode);
+  }
+
+  /** @internal Addressed send, for the package that owns the endpoint. */
+  sendToEndpoint = (binary: Uint8Array, mode: IpcMode = 'reliable', options?: IpcOptions) => {
+    const data = Packet.encode(Packet.create(ipcBody(binary, options))).finish();
 
     const packet = new DataPacket({
       kind: mode === 'lossy' ? DataPacket_Kind.LOSSY : DataPacket_Kind.RELIABLE,

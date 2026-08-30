@@ -5,7 +5,7 @@ import { IPiCamera, IPiCameraOptions } from './pi-camera.types';
 import { LiveKitClient, Participant, Quality, RoomInfo, Speaking } from './signaling/livekit-client';
 import { CloudflareClient } from './signaling/cloudflare-client';
 import { DeviceSession } from './signaling/picamera-api';
-import { ChannelRole, IpcMode, RequestType, RtcPeerConfig } from './peer/rtc-peer';
+import { ChannelRole, IpcMode, IpcOptions, RequestType, RtcPeerConfig } from './peer/rtc-peer';
 import { CommanderPeer } from './peer/commander-peer';
 import { SubscriberPeer } from './peer/subscriber-peer';
 import { PublisherPeer } from './peer/publisher-peer';
@@ -133,6 +133,14 @@ export class PiCamera implements IPiCamera {
   sendData = (data: Uint8Array, mode: IpcMode = 'reliable') => {
     this.cmdPeer?.sendData(data, mode);
     this.pubPeer?.sendData(data, mode);
+  }
+
+  /**
+   * @internal Send to one of the device's named IPC endpoints.
+   */
+  sendToEndpoint = (data: Uint8Array, mode: IpcMode = 'reliable', options?: IpcOptions) => {
+    this.cmdPeer?.sendToEndpoint(data, mode, options);
+    this.pubPeer?.sendToEndpoint(data, mode, options);
   }
 
   startRecording = () => {
