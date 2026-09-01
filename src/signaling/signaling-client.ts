@@ -1,6 +1,6 @@
 import { ActionType } from '../pi-camera.types';
 
-export interface ISignalingClient<
+export interface SignalingClient<
   TClient,
   TAction = ActionType
 > {

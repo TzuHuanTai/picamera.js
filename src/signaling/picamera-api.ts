@@ -8,7 +8,7 @@
  * https://developers.cloudflare.com/realtime/sfu/https-api/
  */
 
-export interface IApiConnectionOptions {
+export interface ApiConnectionOptions {
   /**
    * Base url of the picamera device API, e.g. https://picamera-hono.<account>.workers.dev.
    * The same deployment fronts both LiveKit and the Cloudflare Realtime SFU.
@@ -73,7 +73,7 @@ export class PicameraApi {
   private readonly baseUrl: string;
   private readonly apiKey: string;
 
-  constructor(options: IApiConnectionOptions) {
+  constructor(options: ApiConnectionOptions) {
     this.baseUrl = (options.apiUrl ?? '').replace(/\/+$/, '');
     this.apiKey = options.apiKey ?? '';
   }

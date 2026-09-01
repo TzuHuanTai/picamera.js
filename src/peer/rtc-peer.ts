@@ -1,4 +1,4 @@
-import { IPiCameraOptions } from "../pi-camera.types";
+import { PiCameraOptions } from "../pi-camera.types";
 import { Packet, QueryFileResponse, RecordingResponse, Request } from "../proto/packet";
 import { StreamAssembler, StreamResult } from "../rtc/datachannel-receiver";
 import { arrayBufferToBase64, generateRequestId, yieldToEventLoop } from "../utils/rtc-tools";
@@ -121,7 +121,7 @@ export function ipcBody(binary: Uint8Array, options?: IpcOptions) {
 }
 
 export interface RtcPeerConfig extends RTCConfiguration {
-  options: IPiCameraOptions;
+  options: PiCameraOptions;
 }
 
 interface PendingRequest {
@@ -145,7 +145,7 @@ export class RtcPeer {
   onAnswer?: ((answer: RTCSessionDescriptionInit) => any);
   onReconnectFailed?: (() => any);
 
-  readonly options: IPiCameraOptions;
+  readonly options: PiCameraOptions;
   protected peer: RTCPeerConnection;
   protected channels: Partial<Record<ChannelRole, RTCDataChannel>> = {};
   private localStream?: MediaStream;

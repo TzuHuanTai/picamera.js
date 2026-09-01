@@ -1,10 +1,10 @@
 import mqtt, { MqttClient as MqttLibClient, IClientOptions, MqttProtocol } from 'mqtt';
-import { ISignalingClient, generateUUID } from './signaling-client';
-import { IPiCameraOptions } from '../pi-camera.types';
+import { SignalingClient, generateUUID } from './signaling-client';
+import { PiCameraOptions } from '../pi-camera.types';
 
 export type MqttTopicType = 'offer' | 'answer' | 'ice';
 
-export interface IMqttConnectionOptions {
+export interface MqttConnectionOptions {
   mqttHost?: string;
   mqttPath?: string;
   mqttPort?: number;
@@ -13,8 +13,8 @@ export interface IMqttConnectionOptions {
   mqttPassword?: string;
 }
 
-export class MqttClient implements ISignalingClient<MqttClient, MqttTopicType> {
-  private options: IPiCameraOptions;
+export class MqttClient implements SignalingClient<MqttClient, MqttTopicType> {
+  private options: PiCameraOptions;
   private clientId: string;
   private client: MqttLibClient;
   private readonly topics: MqttTopicType[] = ['offer', 'answer', 'ice'];
@@ -24,7 +24,7 @@ export class MqttClient implements ISignalingClient<MqttClient, MqttTopicType> {
   public onAnswer?: (sdp: RTCSessionDescription) => void;
   public onOffer?: (sdp: RTCSessionDescription) => void;
 
-  constructor(options: IPiCameraOptions) {
+  constructor(options: PiCameraOptions) {
     this.options = options;
     this.clientId = generateUUID();
     const connectionOptions: IClientOptions = {

@@ -6,17 +6,17 @@ import {
 } from './constants/camera-property';
 import { ChannelRole, IpcMode, RequestType } from './peer/rtc-peer';
 import { PiCamera } from './pi-camera';
-import { IPiCameraOptions, RNMediaStream, SignalingType } from './pi-camera.types';
-import { ILiveKitConnectionOptions } from './signaling/livekit-client';
-import { DeviceSession, IApiConnectionOptions } from './signaling/picamera-api';
+import { PiCameraOptions, RNMediaStream, SignalingType } from './pi-camera.types';
+import { LiveKitConnectionOptions } from './signaling/livekit-client';
+import { DeviceSession, ApiConnectionOptions } from './signaling/picamera-api';
 import { FileEntry, QueryFileResponse, VideoMode } from './proto/packet';
 
 export {
   PiCamera,
-  IPiCameraOptions,
+  PiCameraOptions,
   SignalingType,
-  ILiveKitConnectionOptions,
-  IApiConnectionOptions,
+  LiveKitConnectionOptions,
+  ApiConnectionOptions,
   DeviceSession,
   CameraControlId,
   CameraControlValue,

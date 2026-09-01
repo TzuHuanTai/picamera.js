@@ -1,6 +1,6 @@
-import { ISignalingClient, generateUUID } from './signaling-client';
+import { SignalingClient, generateUUID } from './signaling-client';
 
-export interface ILiveKitConnectionOptions {
+export interface LiveKitConnectionOptions {
   /**
    * The LiveKit relay to dial, e.g. wss://picamera-hono.<account>.workers.dev.
    * Matches pi-webrtc's `--livekit-url`.
@@ -74,7 +74,7 @@ class TrickleResponse {
   }
 }
 
-export class LiveKitClient implements ISignalingClient<LiveKitClient, LiveKitActionType> {
+export class LiveKitClient implements SignalingClient<LiveKitClient, LiveKitActionType> {
   private url?: string;
   private livekitKey: string;
   private userId: string;
@@ -95,7 +95,7 @@ export class LiveKitClient implements ISignalingClient<LiveKitClient, LiveKitAct
   onTrackPublished?: () => void;
   onLeave?: () => void;
 
-  constructor(options: ILiveKitConnectionOptions) {
+  constructor(options: LiveKitConnectionOptions) {
     this.url = options.livekitUrl;
     this.livekitKey = options.livekitKey ?? '';
     this.userId = options.userId ?? generateUUID();
