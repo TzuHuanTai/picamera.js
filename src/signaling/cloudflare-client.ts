@@ -1,12 +1,12 @@
-import { ISignalingClient } from './signaling-client';
+import { SignalingClient } from './signaling-client';
 import {
   CfTrackObject,
   DeviceSession,
-  IApiConnectionOptions,
+  ApiConnectionOptions,
   PicameraApi,
   getPublishedTracks,
 } from './picamera-api';
-import { IPiCameraOptions } from '../pi-camera.types';
+import { PiCameraOptions } from '../pi-camera.types';
 
 /**
  * Subscribes to a device's tracks on a Cloudflare Realtime SFU through the picamera device API.
@@ -25,7 +25,7 @@ export type CloudflareActionType = 'answer' | 'leave';
 /** The SFU's own address, and the only ICE server this path needs. */
 const CLOUDFLARE_STUN_URL = 'stun:stun.cloudflare.com:3478';
 
-export class CloudflareClient implements ISignalingClient<CloudflareClient, CloudflareActionType> {
+export class CloudflareClient implements SignalingClient<CloudflareClient, CloudflareActionType> {
   private api: PicameraApi;
   private uid: string;
   private connected = false;
@@ -44,7 +44,7 @@ export class CloudflareClient implements ISignalingClient<CloudflareClient, Clou
   onError?: (err: Error) => void;
   onLeave?: () => void;
 
-  constructor(options: IPiCameraOptions & IApiConnectionOptions) {
+  constructor(options: PiCameraOptions & ApiConnectionOptions) {
     this.api = new PicameraApi(options);
     this.uid = options.uid ?? '';
   }

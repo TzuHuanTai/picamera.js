@@ -1,7 +1,7 @@
 import { CodecType } from './utils/rtc-tools';
-import { IMqttConnectionOptions, MqttTopicType } from './signaling/mqtt-client';
+import { MqttConnectionOptions, MqttTopicType } from './signaling/mqtt-client';
 import {
-  ILiveKitConnectionOptions,
+  LiveKitConnectionOptions,
   LiveKitActionType,
   Participant,
   Quality,
@@ -9,7 +9,7 @@ import {
   Speaking,
 } from './signaling/livekit-client';
 import { CloudflareActionType } from './signaling/cloudflare-client';
-import { DeviceSession, IApiConnectionOptions } from './signaling/picamera-api';
+import { DeviceSession, ApiConnectionOptions } from './signaling/picamera-api';
 import { ChannelRole, IpcMode, RequestType } from './peer/rtc-peer';
 import { QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet';
 import { CameraControlId } from './proto/camera_control';
@@ -31,8 +31,8 @@ export interface RNMediaStream extends MediaStream {
  */
 export type SignalingType = 'mqtt' | 'livekit' | 'cloudflare';
 
-export interface IPiCameraOptions
-  extends IMqttConnectionOptions, ILiveKitConnectionOptions, IApiConnectionOptions {
+export interface PiCameraOptions
+  extends MqttConnectionOptions, LiveKitConnectionOptions, ApiConnectionOptions {
   signaling?: SignalingType;
 
   /**
@@ -58,7 +58,7 @@ export interface IPiCameraOptions
 
 export type ActionType = LiveKitActionType | MqttTopicType | CloudflareActionType;
 
-export interface IPiCameraEvents {
+export interface PiCameraEvents {
   /**
    * Emitted when the WebRTC peer connection state changes.
    *
@@ -188,7 +188,7 @@ export interface IPiCameraEvents {
 
 }
 
-export interface IPiCamera extends IPiCameraEvents {
+export interface PiCameraApi extends PiCameraEvents {
   /**
    * Start trying to establish the WebRTC connection.
    */

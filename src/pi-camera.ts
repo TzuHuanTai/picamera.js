@@ -1,7 +1,7 @@
 import { MqttClient } from './signaling/mqtt-client';
 import { keepOnlyCodec } from './utils/rtc-tools';
-import { ISignalingClient } from './signaling/signaling-client';
-import { IPiCamera, IPiCameraOptions } from './pi-camera.types';
+import { SignalingClient } from './signaling/signaling-client';
+import { PiCameraApi, PiCameraOptions } from './pi-camera.types';
 import { LiveKitClient, Participant, Quality, RoomInfo, Speaking } from './signaling/livekit-client';
 import { CloudflareClient } from './signaling/cloudflare-client';
 import { DeviceSession } from './signaling/picamera-api';
@@ -15,7 +15,7 @@ import { QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet'
 import { CameraControlId } from './proto/camera_control';
 import { CameraControlValue } from './constants/camera-property';
 
-export class PiCamera implements IPiCamera {
+export class PiCamera implements PiCameraApi {
   onConnectionState?: (state: RTCPeerConnectionState) => void;
   onDatachannel?: (role: ChannelRole) => void;
   onSnapshot?: (base64: string) => void;
@@ -35,8 +35,8 @@ export class PiCamera implements IPiCamera {
   onParticipant?: (participant: Participant[]) => void;
   onDeviceSession?: (session: DeviceSession) => void;
 
-  private options: IPiCameraOptions;
-  private client: ISignalingClient<any, any>;
+  private options: PiCameraOptions;
+  private client: SignalingClient<any, any>;
   private rtcTimer?: NodeJS.Timeout;
 
   private cmdPeer?: CommanderPeer;
@@ -44,7 +44,7 @@ export class PiCamera implements IPiCamera {
   private pubPeer?: PublisherPeer;
   private cfPeer?: CloudflarePeer;
 
-  constructor(options: IPiCameraOptions) {
+  constructor(options: PiCameraOptions) {
     this.options = this.initializeOptions(options);
 
     if (this.options.signaling === 'mqtt') {
@@ -163,7 +163,7 @@ export class PiCamera implements IPiCamera {
     this.subPeer?.toggleSpeaker(enabled);
   }
 
-  private initializeOptions(userOptions: IPiCameraOptions): IPiCameraOptions {
+  private initializeOptions(userOptions: PiCameraOptions): PiCameraOptions {
     const defaultOptions = {
       signaling: 'mqtt',
       mqttProtocol: 'wss',
@@ -172,12 +172,12 @@ export class PiCamera implements IPiCamera {
       datachannelOnly: false,
       isMicOn: true,
       isSpeakerOn: true,
-    } as IPiCameraOptions;
+    } as PiCameraOptions;
 
     return { ...defaultOptions, ...userOptions };
   }
 
-  private getRtcConfig = (options: IPiCameraOptions): RTCConfiguration => {
+  private getRtcConfig = (options: PiCameraOptions): RTCConfiguration => {
     let config: RTCConfiguration = {};
     config.iceServers = [];
     config.iceCandidatePoolSize = 10;
