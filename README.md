@@ -102,6 +102,7 @@ export default function App() {
 
 ## Contents
 
+- [Migrating from 2.x](MIGRATION.md) — renamed exports, the new wire protocol, and what it means for your device
 - [API Documentation](docs/API.md) — options, events, methods
 
 ## Examples
