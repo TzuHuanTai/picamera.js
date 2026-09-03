@@ -16,7 +16,7 @@
   * [onTimeout](#onTimeout)
   * [onError](#onerror)
   * [onRoomInfo](#onroominfo)
-  * [onQuility](#onquility)
+  * [onQuality](#onquality)
   * [onSpeaking](#onspeaking)
   * [onParticipant](#onparticipant)
   * [onDeviceSession](#ondevicesession)
@@ -185,7 +185,7 @@ Available flags for initialization.
 
   Emitted when the SFU room information changes.
 
-- ### onQuility
+- ### onQuality
 
   `= (quality: Quality[]) => {}`
 
