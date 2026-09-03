@@ -1,5 +1,8 @@
 {
-  "name": "picamera.js",
+  "name": "@mazupo/client",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/picamera.js",
   "types": "build/index.d.ts",
   "module": "dist/picamera.esm.js",
@@ -25,6 +28,7 @@
     "p2p"
   ],
   "author": "Tzu Huan Tai",
+  "sideEffects": false,
   "license": "AGPL-3.0-only",
   "description": "WebRTC connection for Raspberry Pi Camera",
   "files": [

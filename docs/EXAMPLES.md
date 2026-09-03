@@ -25,7 +25,7 @@ A complete page: open it, and the stream appears once the device answers.
   <body>
     <video id="videoElement" autoplay playsinline controls></video>
     <script type="module">
-      import { PiCamera } from 'picamera.js';
+      import { PiCamera } from '@mazupo/client';
 
       const videoRef = document.getElementById('videoElement');
       const camera = new PiCamera({
@@ -56,7 +56,7 @@ The stream arrives as an `RNMediaStream`, whose `toURL()` feeds `RTCView`.
 ```tsx
 import React, { useEffect, useState } from 'react';
 import { RTCView, registerGlobals } from 'react-native-webrtc';
-import { PiCamera, RNMediaStream } from 'picamera.js';
+import { PiCamera, RNMediaStream } from '@mazupo/client';
 
 registerGlobals();
 
@@ -98,7 +98,7 @@ export default function App() {
 `datachannelOnly: true` skips the media stream entirely, so nothing is encoded or uploaded until the snapshot is asked for. The image arrives base64-encoded once every packet is in.
 
 ```javascript
-import { ChannelRole, PiCamera } from 'picamera.js';
+import { ChannelRole, PiCamera } from '@mazupo/client';
 
 const camera = new PiCamera({
   uid: 'your-custom-uid',
@@ -130,7 +130,7 @@ camera.connect();
 Talks to whatever process the device has on the other end of `--enable-ipc`. Both IPC channels are open whenever the device runs with that flag, so the mode is picked per message: `sendText(msg, 'reliable')` (the default) retransmits until delivered, `'lossy'` gives up sooner for lower latency.
 
 ```javascript
-import { ChannelRole, PiCamera } from 'picamera.js';
+import { ChannelRole, PiCamera } from '@mazupo/client';
 
 const camera = new PiCamera({
   uid: 'your-custom-uid',
@@ -162,7 +162,7 @@ camera.connect();
 Fetches the recording list, downloads the newest file, and hands it to the browser as a normal download. `onProgress` fires as the bytes come in over the DataChannel.
 
 ```javascript
-import { PiCamera } from 'picamera.js';
+import { PiCamera } from '@mazupo/client';
 
 const camera = new PiCamera({
   uid: 'your-custom-uid',
@@ -210,7 +210,7 @@ camera.connect();
 Controls only apply once the peer is up, so set them from `onConnectionState`. The full list of ids is `CameraControlId`. It only works for libcamera sources.
 
 ```javascript
-import { CameraControlId, PiCamera } from 'picamera.js';
+import { CameraControlId, PiCamera } from '@mazupo/client';
 
 const camera = new PiCamera({
   uid: 'your-custom-uid',
@@ -237,7 +237,7 @@ camera.connect();
 Drives the device's on-demand recorder over the command DataChannel, so the device needs `--record-mode=on-demand` (or `both`). Recording runs until you call `stopRecording()` — nothing ends the clip on its own. `onRecording` reports each state change and the file being written.
 
 ```javascript
-import { ChannelRole, PiCamera } from 'picamera.js';
+import { ChannelRole, PiCamera } from '@mazupo/client';
 
 const camera = new PiCamera({
   uid: 'your-custom-uid',
@@ -273,7 +273,7 @@ camera.connect();
 Everyone who joins the room sees the same stream, so the device's uplink carries one copy no matter how many are watching. `onSfuStream` gives the publisher's sid alongside the stream.
 
 ```javascript
-import { PiCamera } from 'picamera.js';
+import { PiCamera } from '@mazupo/client';
 
 const videoRef = document.getElementById('videoElement');
 const camera = new PiCamera({
@@ -298,7 +298,7 @@ Cloudflare has no participants, so `onSfuStream` hands over a **track name** ins
 The device's session id changes on every reconnect, which is why a viewer looks the device up by `uid` rather than holding a session.
 
 ```javascript
-import { PiCamera } from 'picamera.js';
+import { PiCamera } from '@mazupo/client';
 
 // Pulls whatever the device is publishing into a Cloudflare Realtime SFU. The App ID and Secret
 // stay on the device API, so a browser only ever needs its own viewer key.
