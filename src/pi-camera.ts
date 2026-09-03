@@ -30,7 +30,7 @@ export class PiCamera implements PiCameraApi {
   onError?: (err: Error) => void;
 
   onRoomInfo?: (room: RoomInfo) => void;
-  onQuility?: (quality: Quality[]) => void;
+  onQuality?: (quality: Quality[]) => void;
   onSpeaking?: (speaking: Speaking[]) => void;
   onParticipant?: (participant: Participant[]) => void;
   onDeviceSession?: (session: DeviceSession) => void;
@@ -303,7 +303,7 @@ export class PiCamera implements PiCameraApi {
 
     conn.onParticipant = (msg) => this.onParticipant?.(msg);
     conn.onRoomInfo = (msg) => this.onRoomInfo?.(msg);
-    conn.onQuility = (msg) => this.onQuility?.(msg);
+    conn.onQuality = (msg) => this.onQuality?.(msg);
     conn.onSpeaking = (msg) => this.onSpeaking?.(msg);
 
     conn.onLeave = async () => conn.disconnect();

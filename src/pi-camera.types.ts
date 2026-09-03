@@ -170,7 +170,7 @@ export interface PiCameraEvents {
    *
    * @param quality - The new quality settings for the video stream.
    */
-  onQuility?: (quality: Quality[]) => void;
+  onQuality?: (quality: Quality[]) => void;
 
   /**
    * Emitted when an SFU participant starts or stops speaking.

@@ -89,7 +89,7 @@ export class LiveKitClient implements SignalingClient<LiveKitClient, LiveKitActi
   onPublisherIce?: (ice: RTCIceCandidateInit) => void;
   onSubscriberIce?: (ice: RTCIceCandidateInit) => void;
   onRoomInfo?: (participant: RoomInfo) => void;
-  onQuility?: (participant: Quality[]) => void;
+  onQuality?: (participant: Quality[]) => void;
   onSpeaking?: (participant: Speaking[]) => void;
   onParticipant?: (participant: Participant[]) => void;
   onTrackPublished?: () => void;
@@ -154,7 +154,7 @@ export class LiveKitClient implements SignalingClient<LiveKitClient, LiveKitActi
     } else if (action === 'roomInfo') {
       this.onRoomInfo?.(JSON.parse(message));
     } else if (action === 'quality') {
-      this.onQuility?.(JSON.parse(message));
+      this.onQuality?.(JSON.parse(message));
     } else if (action === 'speaking') {
       this.onSpeaking?.(JSON.parse(message));
     } else if (action === 'participant') {
