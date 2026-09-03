@@ -30,13 +30,14 @@
   ],
   "author": "Tzu Huan Tai",
   "sideEffects": false,
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "description": "WebRTC connection for Raspberry Pi Camera",
   "files": [
     "dist/",
     "build/",
     "src/",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "exports": {
     ".": {

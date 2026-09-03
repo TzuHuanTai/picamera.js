@@ -11,8 +11,7 @@
 - [Pull from the Cloudflare Realtime SFU](#pull-from-the-cloudflare-realtime-sfu)
 
 Each snippet stands on its own. `uid` has to match the `--uid` the device was started with, and
-the MQTT settings are the broker both sides talk to — see [Notes](NOTES.md) if you are running
-Mosquitto yourself. Every option, event, and method is listed in the
+the MQTT settings are the broker both sides talk to. Every option, event, and method is listed in the
 [API documentation](API.md).
 
 ## Live video in a browser
