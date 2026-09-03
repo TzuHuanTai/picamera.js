@@ -102,7 +102,6 @@ export default function App() {
 
 ## Contents
 
-- [Notes](docs/NOTES.md) — local IP / VPN, Mosquitto + nginx, self-signed certificates
 - [API Documentation](docs/API.md) — options, events, methods
 
 ## Examples
@@ -119,13 +118,5 @@ export default function App() {
 
 # License
 
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
-
-Included third-party licenses
-mqtt: MIT License
-@livekit/protocol: Apache License 2.0
-See the NOTICE file for full license texts of third-party dependencies.
-
-Commercial license
-If your use case does not permit compliance with the AGPL (e.g., source code disclosure), a commercial license is available.
-For more information, please contact: 📧 tzu.huan.tai@gmail.com
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full terms,
+and [NOTICE](NOTICE) for the third-party components the published bundles include.
