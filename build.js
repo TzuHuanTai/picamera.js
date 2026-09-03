@@ -3,21 +3,13 @@ const esbuild = require('esbuild');
 // React is a peer dependency, so it is never bundled: two copies of it in one page break hooks.
 const external = ['react', 'react/jsx-runtime'];
 
-const base = {
-  bundle: true,
-  platform: 'browser',
-  sourcemap: false,
-  external,
-};
-
-// The main entry also ships script-tag builds for the CDN. The subpaths are for bundlers and
-// Node, which reach ESM here or the tsc CommonJS output under build/ through the exports map.
+// ESM only. Bundlers reach these through the "browser" condition and a script tag loads them
+// as a module; Node and anything asking for CommonJS gets the tsc output under build/ instead.
+// Minified because these ship to browsers as they are, including from a CDN.
 const bundles = [
-  { in: 'src/index.ts', out: 'dist/index.js', format: 'iife' },
-  { in: 'src/index.ts', out: 'dist/index.min.js', format: 'iife', minify: true },
-  { in: 'src/index.ts', out: 'dist/index.esm.js', format: 'esm' },
-  { in: 'src/gamepad/index.ts', out: 'dist/gamepad.esm.js', format: 'esm' },
-  { in: 'src/gamepad/react/index.ts', out: 'dist/gamepad-react.esm.js', format: 'esm' },
+  { in: 'src/index.ts', out: 'dist/index.esm.js' },
+  { in: 'src/gamepad/index.ts', out: 'dist/gamepad.esm.js' },
+  { in: 'src/gamepad/react/index.ts', out: 'dist/gamepad-react.esm.js' },
 ];
 
 // Not under dist/: that directory ships, and a test bundle has no business there.
@@ -30,11 +22,14 @@ const tests = [
 async function run() {
   for (const bundle of bundles) {
     await esbuild.build({
-      ...base,
+      bundle: true,
+      platform: 'browser',
+      format: 'esm',
+      minify: true,
+      sourcemap: false,
+      external,
       entryPoints: [bundle.in],
       outfile: bundle.out,
-      format: bundle.format,
-      minify: bundle.minify === true,
     });
   }
 

@@ -41,10 +41,7 @@
   "exports": {
     ".": {
       "types": "./build/index.d.ts",
-      "browser": {
-        "import": "./dist/index.esm.js",
-        "default": "./dist/index.min.js"
-      },
+      "browser": "./dist/index.esm.js",
       "default": "./build/index.js"
     },
     "./gamepad": {
