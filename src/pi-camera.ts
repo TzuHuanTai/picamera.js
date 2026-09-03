@@ -5,7 +5,7 @@ import { PiCameraApi, PiCameraOptions } from './pi-camera.types';
 import { LiveKitClient, Participant, Quality, RoomInfo, Speaking } from './signaling/livekit-client';
 import { CloudflareClient } from './signaling/cloudflare-client';
 import { DeviceSession } from './signaling/picamera-api';
-import { ChannelRole, IpcMode, IpcOptions, RequestType, RtcPeerConfig } from './peer/rtc-peer';
+import { ChannelRole, IpcMode, IpcOptions, IpcSink, RequestType, RtcPeerConfig } from './peer/rtc-peer';
 import { CommanderPeer } from './peer/commander-peer';
 import { SubscriberPeer } from './peer/subscriber-peer';
 import { PublisherPeer } from './peer/publisher-peer';
@@ -15,7 +15,7 @@ import { QueryFileResponse, RecordingResponse, VideoMode } from './proto/packet'
 import { CameraControlId } from './proto/camera_control';
 import { CameraControlValue } from './constants/camera-property';
 
-export class PiCamera implements PiCameraApi {
+export class PiCamera implements PiCameraApi, IpcSink {
   onConnectionState?: (state: RTCPeerConnectionState) => void;
   onDatachannel?: (role: ChannelRole) => void;
   onSnapshot?: (base64: string) => void;
@@ -141,6 +141,11 @@ export class PiCamera implements PiCameraApi {
   sendToEndpoint = (data: Uint8Array, mode: IpcMode = 'reliable', options?: IpcOptions) => {
     this.cmdPeer?.sendToEndpoint(data, mode, options);
     this.pubPeer?.sendToEndpoint(data, mode, options);
+  }
+
+  /** Whether an IPC payload sent right now would reach the device. */
+  canSend = (mode: IpcMode = 'reliable'): boolean => {
+    return (this.cmdPeer?.canSend(mode) ?? false) || (this.pubPeer?.canSend(mode) ?? false);
   }
 
   startRecording = () => {

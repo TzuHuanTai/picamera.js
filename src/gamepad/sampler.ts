@@ -62,7 +62,7 @@ export class GamepadSampler {
     return this.timer !== null;
   }
 
-  /** Swap the destination without disturbing the loop — a reconnect gives a new one. */
+  /** Swap the destination without disturbing the loop. */
   setSink(sink: IpcSink | null): void {
     this.sink = sink;
   }
@@ -232,6 +232,10 @@ export class GamepadSampler {
           `standard gamepad mapping, so its axes and buttons cannot be read reliably.`,
         );
       }
+      return;
+    }
+
+    if (this.sink.canSend?.('lossy') === false) {
       return;
     }
 

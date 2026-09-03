@@ -165,13 +165,13 @@ Reads a controller and sends each reading to the device's `gamepad` endpoint. Th
 the second opens the socket it is routed to. Without the second, input is sent and silently
 discarded.
 
-Readings go out on the lossy channel, so the sink is handed over once that channel is open and
-taken away when the connection ends — a sampler with no sink keeps running locally, which is
-what `onSnapshot` and `onButton` are reading.
+Readings go out on the lossy channel. Attach before or after `connect()`, it makes no difference:
+nothing is sent until that channel is open, and it stops again when the connection ends. The loop
+keeps running either way, which is what `onSnapshot` and `onButton` are reading.
 
 ```javascript
-import { ChannelRole, PiCamera } from '@mazupo/client';
-import { Button, GamepadSampler } from '@mazupo/client/gamepad';
+import { PiCamera } from '@mazupo/client';
+import { attachGamepad, Button } from '@mazupo/client/gamepad';
 
 const camera = new PiCamera({
   uid: 'your-custom-uid',
@@ -183,31 +183,17 @@ const camera = new PiCamera({
   stunUrls: ['stun:stun1.l.google.com:19302'],
 });
 
-const sampler = new GamepadSampler({ hz: 60 });
+const pad = attachGamepad(camera, { hz: 60 });
 
 // null when no controller is reporting.
-sampler.onSnapshot((snapshot) => {
+pad.onSnapshot((snapshot) => {
   console.log(snapshot?.leftX, snapshot?.leftY);
 });
 
 // Fires once per press and once per release, never while the button is held.
-sampler.onButton(Button.A, (pressed) => {
+pad.onButton(Button.A, (pressed) => {
   if (pressed) camera.snapshot();
 });
-
-sampler.start();
-
-camera.onDatachannel = (role) => {
-  if (role === ChannelRole.Lossy) {
-    sampler.setSink(camera);
-  }
-};
-
-camera.onConnectionState = (state) => {
-  if (state === 'closed' || state === 'failed' || state === 'disconnected') {
-    sampler.setSink(null);
-  }
-};
 
 camera.connect();
 ```
@@ -222,9 +208,9 @@ straight to the view, so a moving stick re-renders that component and nothing ab
 import { PiCamera } from '@mazupo/client';
 import { GamepadView, useGamepad } from '@mazupo/client/gamepad/react';
 
-// Pass the camera only once its lossy channel is open; null until then.
+// Pass the camera as soon as it exists; null before there is one.
 function Controller({ camera }: { camera: PiCamera | null }) {
-  const { connected, suspended, sampler } = useGamepad({ sink: camera });
+  const { connected, suspended, sampler } = useGamepad({ camera, hz: 60 });
 
   if (!connected) {
     return <p>Press any button on your gamepad</p>;

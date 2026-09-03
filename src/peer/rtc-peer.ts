@@ -107,6 +107,12 @@ export interface IpcOptions {
   sequence?: number;
 }
 
+/** A destination for encoded IPC payloads. */
+export interface IpcSink {
+  sendToEndpoint(data: Uint8Array, mode?: IpcMode, options?: IpcOptions): void;
+  canSend?(mode?: IpcMode): boolean;
+}
+
 /** `Ipc` carries an endpoint; without options this is `raw`, which reaches the default socket. */
 export function ipcBody(binary: Uint8Array, options?: IpcOptions) {
   return options
@@ -342,6 +348,11 @@ export class RtcPeer {
 
   protected isChannelOpen(role: ChannelRole): boolean {
     return this.channels[role]?.readyState === 'open';
+  }
+
+  /** Whether a payload sent with this mode would go out right now. */
+  canSend(mode: IpcMode = 'reliable'): boolean {
+    return this.isChannelOpen(ipcModeToRole(mode));
   }
 
   /** False if the channel is not open. */

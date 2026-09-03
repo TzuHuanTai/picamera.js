@@ -1,7 +1,6 @@
-import type { PiCamera } from '../pi-camera';
+import type { IpcSink } from '../peer/rtc-peer';
 
-/** A destination for encoded input. */
-export type IpcSink = Pick<PiCamera, 'sendToEndpoint'>;
+export type { IpcSink };
 
 /** A snapshot of a standard-mapped gamepad. */
 export interface GamepadSnapshot {
@@ -49,7 +48,7 @@ export type SuspendReason =
   | 'disconnected';
 
 export interface GamepadSamplerOptions {
-  /** Destination for samples. Omit to sample without sending. */
+  /** Destination for samples. Omit to sample without sending. Safe to set before it connects. */
   sink?: IpcSink | null;
 
   /** Samples per second. Defaults to 60. */

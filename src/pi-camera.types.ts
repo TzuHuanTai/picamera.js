@@ -261,6 +261,13 @@ export interface PiCameraApi extends PiCameraEvents {
   sendData(msg: Uint8Array, mode?: IpcMode): void;
 
   /**
+   * Whether an IPC payload sent right now would reach the device.
+   *
+   * @param mode - Which IPC channel the payload would go out on.
+   */
+  canSend(mode?: IpcMode): boolean;
+
+  /**
    * Sends a `START_RECORDING` command to the server.
    * The server's response will be delivered via `onRecording`.
    */
