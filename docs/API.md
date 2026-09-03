@@ -287,7 +287,7 @@ Available flags for initialization.
 - ### sendData
 
   `.sendData(binary: Uint8Array, mode?: 'lossy' | 'reliable')`
-  
+
   Same as `sendText`, but sends in binary format.
 
 - ### toggleMic

@@ -20,13 +20,13 @@ Web and React Native client for [pi-webrtc](https://github.com/TzuHuanTai/Raspbe
 ### For Web
 
 ```bash
-npm install picamera.js
+npm install @mazupo/client
 ```
 
 ```html
 <video id="videoElement" autoplay playsinline controls></video>
 <script type="module">
-  import { PiCamera } from 'picamera.js';
+  import { PiCamera } from '@mazupo/client';
 
   const videoRef = document.getElementById('videoElement');
   const camera = new PiCamera({
@@ -55,7 +55,7 @@ both sides talk to.
 Install and configure [react-native-webrtc](https://github.com/react-native-webrtc/react-native-webrtc), then install `picamera.js`:
 
 ```bash
-npm install react-native-webrtc picamera.js
+npm install react-native-webrtc @mazupo/client
 ```
 
 `registerGlobals()` has to run once at app startup, before any `PiCamera` is created:
@@ -63,7 +63,7 @@ npm install react-native-webrtc picamera.js
 ```tsx
 import React, { useEffect, useState } from 'react';
 import { RTCView, registerGlobals } from 'react-native-webrtc';
-import { PiCamera, RNMediaStream } from 'picamera.js';
+import { PiCamera, RNMediaStream } from '@mazupo/client';
 
 registerGlobals();
 
