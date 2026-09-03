@@ -8,10 +8,10 @@
   "module": "dist/index.esm.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TzuHuanTai/PiCamera.js.git"
+    "url": "git+https://github.com/mazupo/client-sdk-js.git"
   },
   "bugs": {
-    "url": "https://github.com/TzuHuanTai/PiCamera.js"
+    "url": "https://github.com/mazupo/client-sdk-js/issues"
   },
   "scripts": {
     "build": "node build.js && tsc",
@@ -31,7 +31,7 @@
   "author": "Tzu Huan Tai",
   "sideEffects": false,
   "license": "Apache-2.0",
-  "description": "WebRTC connection for Raspberry Pi Camera",
+  "description": "JavaScript client SDK for pi-webrtc",
   "files": [
     "dist/",
     "build/",

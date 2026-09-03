@@ -1,18 +1,18 @@
 <p align=center>
-    <img src="docs/icon.png" width="200" alt="PiCamera.js">
+    <img src="docs/icon.png" width="200" alt="JavaScript client SDK for pi-webrtc">
 </p>
 <h1 align="center">
-    PiCamera.js
+    JavaScript client SDK for pi-webrtc
 </h1>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/picamera.js"><img src="https://img.shields.io/npm/dt/picamera.js.svg?color=yellow" alt="npm downloads"></a>
-    <img src="https://img.shields.io/github/v/tag/TzuHuanTai/picamera.js?filter=v*&label=release&color=blue" alt="Release">
+    <a href="https://www.npmjs.com/package/@mazupo/client"><img src="https://img.shields.io/npm/dt/@mazupo/client?color=yellow" alt="npm downloads"></a>
+    <img src="https://img.shields.io/github/v/tag/mazupo/client-sdk-js?filter=v*&label=release&color=blue" alt="Release">
 </p>
 
-Web and React Native client for [pi-webrtc](https://github.com/TzuHuanTai/RaspberryPi-WebRTC), with TypeScript typings and support for low-latency WebRTC streaming, P2P, SFU, DataChannel control, snapshots, and file transfer.
+Web and React Native client for [pi-webrtc](https://github.com/mazupo/pi-webrtc), with TypeScript typings and support for low-latency WebRTC streaming, P2P, SFU, DataChannel control, snapshots, and file transfer.
 
-- Live demo: [PiCamera.js Demo](https://tzuhuantai.github.io/picamera.js/demo/)
+- Live demo: [mazupo.github.io/client-sdk-js/demo](https://mazupo.github.io/client-sdk-js/demo/)
 - Demo source: [demo/index.html](demo/index.html)
 
 ## Quick Start
@@ -52,7 +52,7 @@ both sides talk to.
 
 ### For React Native
 
-Install and configure [react-native-webrtc](https://github.com/react-native-webrtc/react-native-webrtc), then install `picamera.js`:
+Install and configure [react-native-webrtc](https://github.com/react-native-webrtc/react-native-webrtc), then install `@mazupo/client`:
 
 ```bash
 npm install react-native-webrtc @mazupo/client
