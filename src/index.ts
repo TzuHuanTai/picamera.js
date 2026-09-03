@@ -7,7 +7,12 @@ import {
 import { ChannelRole, IpcMode, RequestType } from './peer/rtc-peer';
 import { PiCamera } from './pi-camera';
 import { PiCameraOptions, RNMediaStream, SignalingType } from './pi-camera.types';
-import { LiveKitConnectionOptions } from './signaling/livekit-client';
+import {
+  LiveKitConnectionOptions,
+  Participant,
+  Quality,
+  Speaking
+} from './signaling/livekit-client';
 import { DeviceSession, ApiConnectionOptions } from './signaling/picamera-api';
 import { FileEntry, QueryFileResponse, VideoMode } from './proto/packet';
 
@@ -16,6 +21,9 @@ export {
   PiCameraOptions,
   SignalingType,
   LiveKitConnectionOptions,
+  Participant,
+  Quality,
+  Speaking,
   ApiConnectionOptions,
   DeviceSession,
   CameraControlId,
