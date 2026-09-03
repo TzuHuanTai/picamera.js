@@ -3,9 +3,9 @@
   "publishConfig": {
     "access": "public"
   },
-  "main": "dist/picamera.js",
+  "main": "build/index.js",
   "types": "build/index.d.ts",
-  "module": "dist/picamera.esm.js",
+  "module": "dist/index.esm.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TzuHuanTai/PiCamera.js.git"
@@ -15,7 +15,7 @@
   },
   "scripts": {
     "build": "node build.js && tsc",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node build.js --test && node .test-build/ipc-body.cjs && node .test-build/gamepad.cjs && node .test-build/gamepad-react.cjs",
     "proto:generate": "mkdirp src/proto && protoc -I ./external/protocol/protos --ts_proto_out=src/proto --ts_proto_opt=esModuleInterop=true,outputJsonMethods=false,env=browser ./external/protocol/protos/*.proto",
     "proto:clean": "rimraf src/proto",
     "proto:build": "npm run proto:clean && npm run proto:generate"
@@ -25,7 +25,8 @@
     "pi",
     "webrtc",
     "camera",
-    "p2p"
+    "p2p",
+    "gamepad"
   ],
   "author": "Tzu Huan Tai",
   "sideEffects": false,
@@ -39,22 +40,42 @@
   ],
   "exports": {
     ".": {
+      "types": "./build/index.d.ts",
       "browser": {
-        "import": "./dist/picamera.esm.js",
-        "default": "./dist/picamera.min.js"
+        "import": "./dist/index.esm.js",
+        "default": "./dist/index.min.js"
       },
       "default": "./build/index.js"
     },
-    "./package.json": "./package.json",
-    "./*.map": "./build/*.js.map",
-    "./dist/*": "./dist/*.js",
-    "./*": "./build/*.js"
+    "./gamepad": {
+      "types": "./build/gamepad/index.d.ts",
+      "browser": "./dist/gamepad.esm.js",
+      "default": "./build/gamepad/index.js"
+    },
+    "./gamepad/react": {
+      "types": "./build/gamepad/react/index.d.ts",
+      "browser": "./dist/gamepad-react.esm.js",
+      "default": "./build/gamepad/react/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19.2.5",
     "esbuild": "^0.25.0",
     "mkdirp": "^3.0.1",
+    "react": "^19",
+    "react-dom": "^19.2.8",
     "rimraf": "^6.1.2",
-    "ts-proto": "^2.11.2",
+    "ts-proto": "^2.12.1",
     "typescript": "^5.9.3"
   },
   "dependencies": {

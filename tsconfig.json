@@ -6,7 +6,8 @@
     "removeComments": false,
     "rootDir": "./src",
     "outDir": "./build",
-    "strict": true
+    "strict": true,
+    "jsx": "react-jsx"
   },
   "include": [
     "src"
