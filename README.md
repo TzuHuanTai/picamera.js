@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/github/v/tag/mazupo/client-sdk-js?filter=v*&label=release&color=blue" alt="Release">
 </p>
 
-Web and React Native client for [pi-webrtc](https://github.com/mazupo/pi-webrtc), with TypeScript typings and support for low-latency WebRTC streaming, P2P, SFU, DataChannel control, snapshots, and file transfer.
+Web and React Native client for [pi-webrtc](https://github.com/mazupo/pi-webrtc), with TypeScript typings and support for low-latency WebRTC streaming, P2P, SFU, DataChannel control, snapshots, gamepad input, and file transfer.
 
 - Live demo: [mazupo.github.io/client-sdk-js/demo](https://mazupo.github.io/client-sdk-js/demo/)
 - Demo source: [demo/index.html](demo/index.html)
@@ -111,6 +111,8 @@ export default function App() {
 - [Live video in React Native](docs/EXAMPLES.md#live-video-in-react-native) — `RTCView` with `registerGlobals()`.
 - [Take a snapshot](docs/EXAMPLES.md#take-a-snapshot) — a still image over the command DataChannel, no video stream.
 - [Send and receive IPC messages](docs/EXAMPLES.md#send-and-receive-ipc-messages) — talk to a process on the device.
+- [Drive a device with a gamepad](docs/EXAMPLES.md#drive-a-device-with-a-gamepad) — read a controller and send each reading to the device.
+- [Gamepad in React](docs/EXAMPLES.md#gamepad-in-react) — `useGamepad` and the `<GamepadView>` overlay.
 - [Download a recorded video](docs/EXAMPLES.md#download-a-recorded-video) — list recordings and pull one down.
 - [Adjust camera controls](docs/EXAMPLES.md#adjust-camera-controls) — brightness, contrast, and the rest of `CameraControlId`.
 - [Start and stop recording](docs/EXAMPLES.md#start-and-stop-recording) — drive the device's on-demand recorder.

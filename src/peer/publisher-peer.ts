@@ -38,7 +38,7 @@ export class PublisherPeer extends RtcPeer {
     this.sendToEndpoint(binary, mode);
   }
 
-  /** @internal Addressed send, for the package that owns the endpoint. */
+  /** @internal Addressed send, for whatever encodes for a named endpoint. */
   sendToEndpoint = (binary: Uint8Array, mode: IpcMode = 'reliable', options?: IpcOptions) => {
     const data = Packet.encode(Packet.create(ipcBody(binary, options))).finish();
 

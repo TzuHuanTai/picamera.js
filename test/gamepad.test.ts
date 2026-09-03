@@ -1,6 +1,6 @@
 // Run with: npm test
 //
-// Covers the parts of the sampler that the page this package replaces got wrong: one loop
+// Covers the parts of the sampler that a hand-rolled gamepad page usually gets wrong: one loop
 // however many pads arrive, no unguarded index reads, and a rate that does not depend on
 // the display or on the tab being in front.
 
