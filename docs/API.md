@@ -33,11 +33,13 @@
   * [stopRecording](#stoprecording)
   * [sendText](#sendText)
   * [sendData](#sendData)
+  * [canSend](#canSend)
   * [toggleMic](#toggleMic)
   * [toggleSpeaker](#toggleSpeaker)
 * [Gamepad](#gamepad)
   * [The device has to be listening](#the-device-has-to-be-listening)
   * [Exports](#exports)
+  * [Options](#options)
   * [Behaviour](#behaviour)
 
 ## Data channels
@@ -294,6 +296,12 @@ Available flags for initialization.
 
   Same as `sendText`, but sends in binary format.
 
+- ### canSend
+
+  `.canSend(mode?: 'lossy' | 'reliable'): boolean`
+
+  Whether a payload sent right now would reach the device. False until the channel carrying `mode` is open, and again once the connection is gone.
+
 - ### toggleMic
 
   `.toggleMic(enabled?: boolean)`
@@ -311,7 +319,7 @@ Available flags for initialization.
 Reads a controller, encodes each reading, and sends it to the device's `gamepad` endpoint.
 
 ```ts
-import { GamepadSampler, Button, isPressed } from '@mazupo/client/gamepad';
+import { attachGamepad, Button, isPressed } from '@mazupo/client/gamepad';
 import { useGamepad, GamepadView } from '@mazupo/client/gamepad/react';
 ```
 
@@ -343,7 +351,8 @@ report = InputReport(); report.ParseFromString(body)
 
 | Export | |
 | --- | --- |
-| `GamepadSampler` | The loop. `start()`, `stop()`, `setSink()`, `onSnapshot()`, `onButton()`, `onButtonChange()`, `onSuspend()`, `.snapshot`, `.sampling` |
+| `attachGamepad(camera, options?)` | Reads a controller into a `PiCamera`. Returns the sampler, already running |
+| `GamepadSampler` | The loop. `start()`, `stop()`, `onSnapshot()`, `onButton()`, `onButtonChange()`, `onSuspend()`, `setSink()`, `.snapshot`, `.sampling` |
 | `toSnapshot(gamepad)` | Browser `Gamepad` to a plain snapshot |
 | `isPressed(snapshot, index)` / `Button` | Reading the bitfield |
 | `sameSnapshot(a, b)` | Whether two readings would drive the hardware identically |
@@ -351,8 +360,11 @@ report = InputReport(); report.ParseFromString(body)
 | `useGamepad(options)` <sup>react</sup> | Runs a sampler for the life of a component |
 | `GamepadView` <sup>react</sup> | The SVG view |
 
-Pass a `PiCamera` as the sampler's `sink`, or hand one over later with `setSink()` — a reconnect
-gives a new one, and `null` stops sending without stopping the loop.
+`attachGamepad(camera, options?)` is the whole setup, in any order relative to `connect()`: a
+reading taken before the link is up is dropped, and sending picks up once the channel opens.
+[canSend](#canSend) is what it consults. `GamepadSampler` is the same loop without the camera,
+for driving it by hand or sending somewhere else; its `setSink()` changes destination, it does
+not follow a connection.
 
 `buttons` is a bitfield, bit *n* being `buttons[n].pressed` in the standard mapping; read it with
 `isPressed(snapshot, Button.Start)`. An axis or button the controller does not report reads as
@@ -361,6 +373,20 @@ centred or released rather than throwing.
 `onButton` and `onButtonChange` fire once on press and once on release, never while a button is
 held, and run whether or not a sink is set. Both return a function that removes the listener. A
 controller unplugged mid-hold reports whatever it held as released, so a toggle cannot stick on.
+
+### Options
+
+Taken by `attachGamepad`, `useGamepad`, and the `GamepadSampler` constructor.
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| hz | `number` | `60` | Samples per second. |
+| endpoint | `string` | `gamepad` | The device IPC endpoint each reading is addressed to. |
+| sampleWhileHidden | `boolean` | `false` | Keep sampling while the document is hidden. |
+| sink | `IpcSink \| null` | | Destination, for `GamepadSampler` only. `attachGamepad` and `useGamepad` take the camera instead. |
+
+Anything with `sendToEndpoint` is an `IpcSink`, exported from the main entry point; `PiCamera`
+implements it.
 
 ### Behaviour
 

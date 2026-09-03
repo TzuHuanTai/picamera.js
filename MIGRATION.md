@@ -151,8 +151,10 @@ From a CDN:
 New in 3.0, and the reason `@pi-webrtc/gamepad` was never published separately:
 
 ```ts
-import { GamepadSampler, Button } from '@mazupo/client/gamepad';
+import { attachGamepad, Button } from '@mazupo/client/gamepad';
 import { useGamepad, GamepadView } from '@mazupo/client/gamepad/react';
+
+const pad = attachGamepad(camera);
 ```
 
 React is an optional peer dependency, needed only for the `/gamepad/react` entry point.

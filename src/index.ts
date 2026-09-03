@@ -4,7 +4,7 @@ import {
   CameraControlValue,
   CameraValueLabels
 } from './constants/camera-property';
-import { ChannelRole, IpcMode, RequestType } from './peer/rtc-peer';
+import { ChannelRole, IpcMode, IpcSink, RequestType } from './peer/rtc-peer';
 import { PiCamera } from './pi-camera';
 import { PiCameraOptions, RNMediaStream, SignalingType } from './pi-camera.types';
 import {
@@ -30,6 +30,7 @@ export {
   CameraControlValue,
   ChannelRole,
   IpcMode,
+  IpcSink,
   CameraKeyLabels,
   CameraValueLabels,
   RequestType,

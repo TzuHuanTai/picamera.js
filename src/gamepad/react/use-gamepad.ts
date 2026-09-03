@@ -13,8 +13,8 @@ export interface UseGamepadResult {
 }
 
 export interface UseGamepadOptions extends Omit<GamepadSamplerOptions, 'sink'> {
-  /** A `PiCamera` fits. May be null before the connection is up, and may change after. */
-  sink?: IpcSink | null;
+  /** Where to send input. A `PiCamera` fits, as soon as it exists — connected or not. */
+  camera?: IpcSink | null;
 }
 
 /**
@@ -22,7 +22,7 @@ export interface UseGamepadOptions extends Omit<GamepadSamplerOptions, 'sink'> {
  * `suspended` in state. Readings arrive 60/s; holding them here would re-render the caller.
  */
 export function useGamepad(options: UseGamepadOptions = {}): UseGamepadResult {
-  const { sink = null, hz, endpoint, sampleWhileHidden } = options;
+  const { camera = null, hz, endpoint, sampleWhileHidden } = options;
 
   const [connected, setConnected] = useState(false);
   const [suspended, setSuspended] = useState<SuspendReason | null>(null);
@@ -54,9 +54,10 @@ export function useGamepad(options: UseGamepadOptions = {}): UseGamepadResult {
     };
   }, [sampler]);
 
+  // Only when the camera itself changes; its connection state is not React's business.
   useEffect(() => {
-    sampler.setSink(sink);
-  }, [sampler, sink]);
+    sampler.setSink(camera);
+  }, [sampler, camera]);
 
   return { connected, suspended, sampler };
 }

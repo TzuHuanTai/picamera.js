@@ -4,6 +4,7 @@
 // however many pads arrive, no unguarded index reads, and a rate that does not depend on
 // the display or on the tab being in front.
 
+import { attachGamepad } from '../src/gamepad/attach';
 import { GamepadSampler } from '../src/gamepad/sampler';
 import { Button, isPressed, sameSnapshot, toSnapshot } from '../src/gamepad/snapshot';
 import { InputReport } from '../src/proto/input';
@@ -28,9 +29,16 @@ interface Sent {
 
 class RecordingSink implements IpcSink {
   readonly sent: Sent[] = [];
+  /** Flip to model a link that comes up late, or goes away. */
+  open = true;
+
   sendToEndpoint(data: Uint8Array, mode?: 'lossy' | 'reliable',
                  options?: { endpoint?: string; sequence?: number }) {
     this.sent.push({ data, mode, options });
+  }
+
+  canSend() {
+    return this.open;
   }
 }
 
@@ -249,10 +257,78 @@ async function testButtonEvents() {
   pads = [];
 }
 
+// --- holding a destination across the life of a connection -------------------
+
+async function testLinkGating() {
+  console.log('[15] a destination handed over before the link is up');
+  pads = [fakePad()];
+  const camera = new RecordingSink();
+  camera.open = false;
+  const sampler = new GamepadSampler({ sink: camera, hz: 100 });
+  const seen: number[] = [];
+  sampler.onButtonChange((e) => seen.push(e.index));
+
+  sampler.start();
+  await wait(120);
+  check(camera.sent.length === 0, 'nothing is sent while the link is down');
+
+  const held = fakePad();
+  (held.buttons as any)[Button.A] = { pressed: true, touched: true, value: 1 };
+  pads = [held];
+  await wait(60);
+  check(seen.length === 1, 'but local listeners still fire, so the page works offline');
+
+  console.log('[16] and picked up when the link comes up, with no rewiring');
+  camera.open = true;
+  await wait(120);
+  check(camera.sent.length > 0, `sending started on its own (${camera.sent.length} messages)`);
+  check(camera.sent[0].options?.sequence === 1,
+        'and the first message the device sees is sequence 1, not one from the dead ticks');
+
+  console.log('[17] and dropped again when it goes away');
+  camera.open = false;
+  const atClose = camera.sent.length;
+  await wait(120);
+  check(camera.sent.length === atClose, 'nothing is sent after the link closes');
+
+  camera.open = true;
+  await wait(60);
+  check(camera.sent.length > atClose, 'and it comes back on reconnect');
+  // Nth send carries sequence N; a gap would mean dead ticks were counted.
+  const last = camera.sent[camera.sent.length - 1].options?.sequence ?? 0;
+  check(last === camera.sent.length,
+        `the sequence counts sends, not ticks (${last} for ${camera.sent.length} messages)`);
+
+  sampler.stop();
+  pads = [];
+}
+
+async function testAttach() {
+  console.log('[18] attachGamepad starts the loop and sends to the camera');
+  pads = [fakePad()];
+  const camera = new RecordingSink();
+  const sampler = attachGamepad(camera, { hz: 100 });
+  check(sampler.sampling, 'it is already running, with no start() call');
+  await wait(120);
+  check(camera.sent.length > 0, `and sending (${camera.sent.length} messages)`);
+  check(camera.sent[0].options?.endpoint === 'gamepad', "to the 'gamepad' endpoint");
+
+  console.log('[19] stop() detaches it');
+  sampler.stop();
+  const atStop = camera.sent.length;
+  await wait(80);
+  check(camera.sent.length === atStop, 'nothing more is sent');
+  check(!sampler.sampling, 'and the loop is stopped');
+
+  pads = [];
+}
+
 async function main() {
   await testSnapshot();
   await testSampler();
   await testButtonEvents();
+  await testLinkGating();
+  await testAttach();
   console.log(failures === 0 ? '\nALL PASSED' : `\nFAILURES: ${failures}`);
   process.exit(failures === 0 ? 0 : 1);
 }

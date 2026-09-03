@@ -1,3 +1,5 @@
+export { attachGamepad } from './attach';
+export type { AttachGamepadOptions } from './attach';
 export { GamepadSampler } from './sampler';
 export { Button, isPressed, sameSnapshot, toSnapshot } from './snapshot';
 export type { ButtonName } from './snapshot';
