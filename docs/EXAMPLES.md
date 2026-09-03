@@ -144,7 +144,7 @@ const camera = new PiCamera({
 
 camera.onDatachannel = (role) => {
   if (role === ChannelRole.Reliable) {
-    camera.sendText('Hello! this is picamera.js!');
+    camera.sendText('Hello! this is @mazupo/client!');
   }
 };
 
@@ -328,7 +328,7 @@ camera.connect();
 ```
 
 For SFU deployment on the device side, see
-[Broadcasting a Live Stream to Many Viewers via SFU](https://github.com/TzuHuanTai/RaspberryPi-WebRTC/blob/main/docs/ADVANCED.md#broadcasting-a-live-stream-to-many-viewers-via-sfu).
+[Broadcasting a Live Stream to Many Viewers via SFU](https://github.com/mazupo/pi-webrtc/blob/main/docs/ADVANCED.md#broadcasting-a-live-stream-to-many-viewers-via-sfu).
 
 ---
 

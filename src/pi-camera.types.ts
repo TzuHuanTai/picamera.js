@@ -17,7 +17,7 @@ import { CameraControlValue } from './constants/camera-property';
 
 /**
  * MediaStream extended with toURL() for React Native (react-native-webrtc).
- * When using picamera.js in React Native, call registerGlobals() from
+ * When using @mazupo/client in React Native, call registerGlobals() from
  * react-native-webrtc at app startup to inject this method at runtime.
  */
 export interface RNMediaStream extends MediaStream {
