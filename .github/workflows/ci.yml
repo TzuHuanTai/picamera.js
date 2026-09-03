@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# A newer push to the same branch makes the running one irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Protoc
+        env:
+          PROTOC_VERSION: '33.0'
+        run: |
+          curl -sSL -o /tmp/protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
+          sudo unzip -q -o /tmp/protoc.zip -d /usr/local bin/protoc 'include/*'
+          sudo chmod +x /usr/local/bin/protoc
+          protoc --version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Proto files
+        run: npm run proto:build
+
+      - name: Test
+        run: npm test
+
+      # Also runs tsc, so a type error fails here rather than at publish time.
+      - name: Build
+        run: npm run build
+
+  protocol:
+    name: Protocol pin matches pi-webrtc
+    runs-on: ubuntu-latest
+
+    # The two sides generate their code from the same protos. If they pin different
+    # commits, a client and a device connect and then fail to parse each other -- there
+    # is no handshake that catches it. Cheaper to catch here than on the hardware.
+    steps:
+      # No submodule content needed: the gitlink alone carries the commit.
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Compare pins
+        run: |
+          ours=$(git rev-parse HEAD:external/protocol)
+          theirs=$(curl -sSf \
+            "https://api.github.com/repos/mazupo/pi-webrtc/contents/external/protocol?ref=main" \
+            | jq -r .sha)
+
+          echo "client-sdk-js  $ours"
+          echo "pi-webrtc      $theirs"
+
+          if [ "$ours" != "$theirs" ]; then
+            echo "::error::protocol submodule drift: this branch pins $ours, pi-webrtc main pins $theirs"
+            echo ""
+            echo "Both sides must generate from the same protos. Update whichever is behind,"
+            echo "or land the pi-webrtc change on main first."
+            exit 1
+          fi
+
+          echo "In sync."
