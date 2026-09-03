@@ -35,6 +35,10 @@
   * [sendData](#sendData)
   * [toggleMic](#toggleMic)
   * [toggleSpeaker](#toggleSpeaker)
+* [Gamepad](#gamepad)
+  * [The device has to be listening](#the-device-has-to-be-listening)
+  * [Exports](#exports)
+  * [Behaviour](#behaviour)
 
 ## Data channels
 
@@ -301,6 +305,75 @@ Available flags for initialization.
   `.toggleSpeaker(enabled?: boolean)`
 
   Toggles the **remote** audio stream on or off. If an argument is provided, it will force the state to the specified value, otherwise, the current state will be toggled.
+
+## Gamepad
+
+Reads a controller, encodes each reading, and sends it to the device's `gamepad` endpoint.
+
+```ts
+import { GamepadSampler, Button, isPressed } from '@mazupo/client/gamepad';
+import { useGamepad, GamepadView } from '@mazupo/client/gamepad/react';
+```
+
+`react` is an optional peer dependency, needed only for the second. `GamepadView` draws with SVG
+and is web-only; the headless entry point works under React Native.
+
+Examples: [browser](EXAMPLES.md#drive-a-device-with-a-gamepad),
+[React](EXAMPLES.md#gamepad-in-react).
+
+### The device has to be listening
+
+```bash
+pi-webrtc --enable-ipc --enable-gamepad ...
+```
+
+`--enable-ipc` opens the channels this arrives on, `--enable-gamepad` opens the socket it is
+routed to. Without the second, input is sent and silently discarded.
+
+Each reading reaches that socket as a `protocol.InputReport`, preceded by a big-endian `uint32`
+length:
+
+```python
+header = await reader.readexactly(4)
+body = await reader.readexactly(int.from_bytes(header, "big"))
+report = InputReport(); report.ParseFromString(body)
+```
+
+### Exports
+
+| Export | |
+| --- | --- |
+| `GamepadSampler` | The loop. `start()`, `stop()`, `setSink()`, `onSnapshot()`, `onButton()`, `onButtonChange()`, `onSuspend()`, `.snapshot`, `.sampling` |
+| `toSnapshot(gamepad)` | Browser `Gamepad` to a plain snapshot |
+| `isPressed(snapshot, index)` / `Button` | Reading the bitfield |
+| `sameSnapshot(a, b)` | Whether two readings would drive the hardware identically |
+| `InputReport`, `GamepadInput` | The generated protobuf types |
+| `useGamepad(options)` <sup>react</sup> | Runs a sampler for the life of a component |
+| `GamepadView` <sup>react</sup> | The SVG view |
+
+Pass a `PiCamera` as the sampler's `sink`, or hand one over later with `setSink()` — a reconnect
+gives a new one, and `null` stops sending without stopping the loop.
+
+`buttons` is a bitfield, bit *n* being `buttons[n].pressed` in the standard mapping; read it with
+`isPressed(snapshot, Button.Start)`. An axis or button the controller does not report reads as
+centred or released rather than throwing.
+
+`onButton` and `onButtonChange` fire once on press and once on release, never while a button is
+held, and run whether or not a sink is set. Both return a function that removes the listener. A
+controller unplugged mid-hold reports whatever it held as released, so a toggle cannot stick on.
+
+### Behaviour
+
+- Samples on a fixed timer rather than `requestAnimationFrame`: the device reads a steady stream
+  as proof the link is alive, so the rate must not follow the display.
+- Stops while the document is hidden. `sampleWhileHidden: true` overrides it.
+- Sequences every message, so the device can drop a stale reading arriving late on the unordered
+  lossy channel.
+- Sends nothing for a pad outside the W3C standard mapping, reporting it as
+  `standardMapping: false` — its fields would not mean what their names say.
+- `start()` is idempotent, and a second controller does not start a second loop.
+- Applies no deadzone. pi-webrtc's own consumer does, and splitting that decision across two
+  codebases would drift.
 
 ---
 

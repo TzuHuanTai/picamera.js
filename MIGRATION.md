@@ -114,17 +114,6 @@ way. It is now an argument, defaulting to `'reliable'`.
 `sendData` takes the same second argument. Both still default to `'reliable'`, so calls that
 never set `ipcMode` need no change.
 
-### `sendToEndpoint` is new
-
-The device can serve named IPC endpoints alongside the default socket:
-
-```ts
-camera.sendToEndpoint(bytes, 'lossy', { endpoint: 'gamepad', sequence: n });
-```
-
-`sequence` lets the device drop anything older than the last it accepted. Leaving it out (or
-passing 0) opts out of that.
-
 ## Deep imports are gone
 
 2.x shipped `"./*": "./build/*.js"` in its exports map, which made every file under `build/`

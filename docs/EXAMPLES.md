@@ -4,6 +4,8 @@
 - [Live video in React Native](#live-video-in-react-native)
 - [Take a snapshot](#take-a-snapshot)
 - [Send and receive IPC messages](#send-and-receive-ipc-messages)
+- [Drive a device with a gamepad](#drive-a-device-with-a-gamepad)
+- [Gamepad in React](#gamepad-in-react)
 - [Download a recorded video](#download-a-recorded-video)
 - [Adjust camera controls](#adjust-camera-controls)
 - [Start and stop recording](#start-and-stop-recording)
@@ -155,6 +157,89 @@ camera.onMessage = (data) => {
 
 camera.connect();
 ```
+
+## Drive a device with a gamepad
+
+Reads a controller and sends each reading to the device's `gamepad` endpoint. The device needs
+**both** `--enable-ipc` and `--enable-gamepad`: the first opens the channels this arrives on,
+the second opens the socket it is routed to. Without the second, input is sent and silently
+discarded.
+
+Readings go out on the lossy channel, so the sink is handed over once that channel is open and
+taken away when the connection ends — a sampler with no sink keeps running locally, which is
+what `onSnapshot` and `onButton` are reading.
+
+```javascript
+import { ChannelRole, PiCamera } from '@mazupo/client';
+import { Button, GamepadSampler } from '@mazupo/client/gamepad';
+
+const camera = new PiCamera({
+  uid: 'your-custom-uid',
+  mqttHost: 'your.mqtt.cloud',
+  mqttPath: '/mqtt',
+  mqttPort: 8884,
+  mqttUsername: 'hakunamatata',
+  mqttPassword: 'Wonderful',
+  stunUrls: ['stun:stun1.l.google.com:19302'],
+});
+
+const sampler = new GamepadSampler({ hz: 60 });
+
+// null when no controller is reporting.
+sampler.onSnapshot((snapshot) => {
+  console.log(snapshot?.leftX, snapshot?.leftY);
+});
+
+// Fires once per press and once per release, never while the button is held.
+sampler.onButton(Button.A, (pressed) => {
+  if (pressed) camera.snapshot();
+});
+
+sampler.start();
+
+camera.onDatachannel = (role) => {
+  if (role === ChannelRole.Lossy) {
+    sampler.setSink(camera);
+  }
+};
+
+camera.onConnectionState = (state) => {
+  if (state === 'closed' || state === 'failed' || state === 'disconnected') {
+    sampler.setSink(null);
+  }
+};
+
+camera.connect();
+```
+
+## Gamepad in React
+
+`useGamepad` runs a sampler for the life of the component and `<GamepadView>` draws it. Only
+`connected` and `suspended` reach React state — readings arrive 60 times a second and go
+straight to the view, so a moving stick re-renders that component and nothing above it.
+
+```tsx
+import { PiCamera } from '@mazupo/client';
+import { GamepadView, useGamepad } from '@mazupo/client/gamepad/react';
+
+// Pass the camera only once its lossy channel is open; null until then.
+function Controller({ camera }: { camera: PiCamera | null }) {
+  const { connected, suspended, sampler } = useGamepad({ sink: camera });
+
+  if (!connected) {
+    return <p>Press any button on your gamepad</p>;
+  }
+
+  return (
+    <>
+      <GamepadView sampler={sampler} />
+      {suspended && <p>Input paused ({suspended})</p>}
+    </>
+  );
+}
+```
+
+`react` is an optional peer dependency, needed only for this entry point.
 
 ## Download a recorded video
 
