@@ -109,8 +109,6 @@ export class MqttClient implements SignalingClient<MqttClient, MqttTopicType> {
   disconnect = () => {
     if (this.client.disconnected) return;
 
-    const fullTopics = this.topics.map((t) => this.getFullTopic(t));
-    this.client.unsubscribe(fullTopics);
     this.client.end(true);
 
     console.debug(`MQTT disconnected from "${this.options.uid}" with clientId: ${this.clientId}`);
