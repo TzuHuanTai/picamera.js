@@ -271,6 +271,7 @@ export class PiCamera implements PiCameraApi, IpcSink {
         conn.send('answer', JSON.stringify(answer));
       }
     };
+    conn.onError = (err) => this.onError?.(err);
     conn.onConnect = () => {
       if (this.cmdPeer?.connectionState === 'new') {
         this.cmdPeer.createOffer();

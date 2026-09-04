@@ -20,6 +20,7 @@ export class MqttClient implements SignalingClient<MqttClient, MqttTopicType> {
   private readonly topics: MqttTopicType[] = ['offer', 'answer', 'ice'];
 
   public onConnect?: (conn: MqttClient) => void;
+  public onError?: (err: Error) => void;
   public onIceCandidate?: (candidate: RTCIceCandidate) => void;
   public onAnswer?: (sdp: RTCSessionDescription) => void;
   public onOffer?: (sdp: RTCSessionDescription) => void;
@@ -53,6 +54,7 @@ export class MqttClient implements SignalingClient<MqttClient, MqttTopicType> {
       this.client.subscribe(fullTopics, { qos: 2, nl: true }, (err) => {
         if (err) {
           console.error('MQTT subscription failed:', err);
+          this.onError?.(err);
           return;
         }
         this.onConnect?.(this);
