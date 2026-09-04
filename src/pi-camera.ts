@@ -36,8 +36,10 @@ export class PiCamera implements PiCameraApi, IpcSink {
   onDeviceSession?: (session: DeviceSession) => void;
 
   private options: PiCameraOptions;
-  private client: SignalingClient<any, any>;
+  private client!: SignalingClient<any, any>;
   private rtcTimer?: NodeJS.Timeout;
+  private isConnecting = false;
+  private isTerminated = false;
 
   private cmdPeer?: CommanderPeer;
   private subPeer?: SubscriberPeer;
@@ -46,13 +48,21 @@ export class PiCamera implements PiCameraApi, IpcSink {
 
   constructor(options: PiCameraOptions) {
     this.options = this.initializeOptions(options);
+    this.initializeSession();
+  }
+
+  private initializeSession = () => {
+    this.cmdPeer = undefined;
+    this.subPeer = undefined;
+    this.pubPeer = undefined;
+    this.cfPeer = undefined;
 
     if (this.options.signaling === 'mqtt') {
       this.client = new MqttClient(this.options);
       this.InitializeCmdPeer(this.client as MqttClient);
     } else if (this.options.signaling === 'livekit') {
       this.client = new LiveKitClient(this.options);
-      this.InitializeSfuPeer(this.client as LiveKitClient);
+      this.InitializeLivekitPeer(this.client as LiveKitClient);
     } else if (this.options.signaling === 'cloudflare') {
       this.client = new CloudflareClient(this.options);
       this.InitializeCloudflarePeer(this.client as CloudflareClient);
@@ -62,28 +72,42 @@ export class PiCamera implements PiCameraApi, IpcSink {
   }
 
   connect = () => {
+    if (this.isConnecting) {
+      console.warn("PiCamera is already connecting, ignoring the duplicated connect().");
+      return;
+    }
+
+    if (this.isTerminated) {
+      this.initializeSession();
+      this.isTerminated = false;
+    }
+    this.isConnecting = true;
+
     this.client.connect();
 
     if (this.options.timeout !== 0) {
       this.rtcTimer = setTimeout(() => {
-        if (this.cmdPeer?.connectionState === 'connected' ||
-          this.subPeer?.connectionState === 'connected' ||
-          this.pubPeer?.connectionState === 'connected' ||
-          this.cfPeer?.connectionState === 'connected') {
+        this.rtcTimer = undefined;
+        if (this.isPeerConnected()) {
           return;
-        }
-        if (this.onTimeout) {
-          this.onTimeout();
         }
 
         console.warn("RTC connection timeout.");
+        this.onTimeout?.();
         this.terminate();
       }, this.options.timeout);
     }
   }
 
   terminate = () => {
+    if (this.isTerminated) {
+      return;
+    }
+    this.isTerminated = true;
+    this.isConnecting = false;
+
     clearTimeout(this.rtcTimer);
+    this.rtcTimer = undefined;
     this.cmdPeer?.close();
     this.subPeer?.close();
     this.pubPeer?.close();
@@ -91,6 +115,13 @@ export class PiCamera implements PiCameraApi, IpcSink {
     this.client.disconnect();
     this.onConnectionState?.('closed');
     console.debug("PiCamera connections had been terminated.");
+  }
+
+  private isPeerConnected = (): boolean => {
+    return this.cmdPeer?.connectionState === 'connected' ||
+      this.subPeer?.connectionState === 'connected' ||
+      this.pubPeer?.connectionState === 'connected' ||
+      this.cfPeer?.connectionState === 'connected';
   }
 
   getStatus = (): RTCPeerConnectionState => {
@@ -249,7 +280,7 @@ export class PiCamera implements PiCameraApi, IpcSink {
     };
   }
 
-  private InitializeSfuPeer(conn: LiveKitClient) {
+  private InitializeLivekitPeer(conn: LiveKitClient) {
     conn.onConnect = () => {
       // console.debug("WebSocket connected!");
     };
@@ -310,13 +341,13 @@ export class PiCamera implements PiCameraApi, IpcSink {
     conn.onRoomInfo = (msg) => this.onRoomInfo?.(msg);
     conn.onQuality = (msg) => this.onQuality?.(msg);
     conn.onSpeaking = (msg) => this.onSpeaking?.(msg);
-
-    conn.onLeave = async () => conn.disconnect();
+    conn.onLeave = async () => this.terminate();
   }
 
   private InitializeCloudflarePeer(conn: CloudflareClient) {
     conn.onDeviceSession = (session) => this.onDeviceSession?.(session);
     conn.onError = (err) => this.onError?.(err);
+    conn.onLeave = () => this.terminate();
 
     conn.onJoin = (iceServers) => {
       const config: RtcPeerConfig = {
