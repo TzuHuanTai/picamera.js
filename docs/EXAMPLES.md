@@ -348,7 +348,7 @@ import { PiCamera } from '@mazupo/client';
 const videoRef = document.getElementById('videoElement');
 const camera = new PiCamera({
   signaling: 'livekit',
-  livekitUrl: 'wss://api.picamera.live',
+  livekitUrl: 'wss://api.mazupo.com',
   livekitKey: 'APIWnQTs4tmUZvA',
   livekitRoom: 'my-first-room',
 });
@@ -375,7 +375,7 @@ import { PiCamera } from '@mazupo/client';
 const videoRef = document.getElementById('videoElement');
 const camera = new PiCamera({
   signaling: 'cloudflare',
-  apiUrl: 'https://api.picamera.live',
+  apiUrl: 'https://api.mazupo.com',
   apiKey: 'your-viewer-api-key',
   uid: 'your-custom-uid',
 });
